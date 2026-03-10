@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//private/tmp/**)",
+      "Bash(npx create-next-app@latest concept-mesh-scaffold --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --yes)"
+    ]
+  }
+}
