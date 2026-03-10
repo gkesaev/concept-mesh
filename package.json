@@ -20,6 +20,7 @@
     "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
     "next": "16.1.6",
+    "pg": "^8.20.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "zustand": "^5.0.11"
@@ -28,6 +29,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/d3-force": "^3.0.10",
     "@types/node": "^20",
+    "@types/pg": "^8.18.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

@@ -1,0 +1,27 @@
+name: concept-mesh
+
+# Production overrides — use alongside docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  db:
+    restart: always
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://yourdomain.com}
+    restart: always
+    # No source bind-mounts in production
+    volumes: []
+    environment:
+      NODE_ENV: production
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: sh -c "npx drizzle-kit migrate && npm run db:seed"
+    volumes: []
