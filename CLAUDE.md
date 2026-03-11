@@ -254,3 +254,88 @@ NEXT_PUBLIC_APP_URL=         # Public URL for the app
 - Performance optimization (virtualization, lazy loading)
 - Error handling and edge cases
 - Visual polish (animations, particles, glow effects)
+
+## Review Agents
+
+Custom slash commands for quality gates. Run these before merging any PR or after significant changes.
+
+| Command | Purpose | When to Run |
+|---------|---------|-------------|
+| `/review-code` | Coding standards compliance | Every PR, every significant change |
+| `/review-security` | Security audit (sandbox, API, secrets) | Any change to viz pipeline, API routes, or iframe code |
+| `/review-viz` | Validate AI-generated visualization code | After pipeline changes or new viz generation |
+| `/review-pr` | Full PR review (architecture + breaking changes) | Before merging any PR |
+| `/review-perf` | Performance audit (canvas, layout, data loading) | After canvas/layout/store changes |
+| `/review-a11y` | Accessibility audit (modals, keyboard, contrast) | After UI component changes |
+
+### When to Run Reviews
+- **Before every merge**: `/review-pr` (includes code + architecture)
+- **After touching `lib/ai/` or `VizRenderer`**: `/review-security` + `/review-viz`
+- **After touching `components/` or `store/`**: `/review-perf` + `/review-a11y`
+- **After adding dependencies**: `/review-code` (license check) + `/review-security` (CVE check)
+
+## Error Handling Patterns
+
+### API Routes
+- Return structured JSON errors: `{ error: string, code?: string }`
+- Use appropriate HTTP status codes: 400 (bad input), 404 (not found), 500 (server error)
+- Never leak stack traces or internal details in production
+- Log errors server-side with context (concept ID, operation name)
+
+### SSE Streams
+- Send `event: error` with JSON payload on failure
+- Always send `event: done` to signal completion (even on error)
+- Client must close EventSource on unmount and on `done` event
+
+### Canvas Components
+- React Flow error boundary catches rendering errors per-node
+- Visualization iframe errors are caught via postMessage and displayed in VizError
+- Network failures show a retry prompt, not a crash
+
+### Store Actions
+- Optimistic updates with rollback on API failure
+- Never leave store in an inconsistent state — use immer or replace atomically
+
+## Testing Strategy
+
+### Unit Tests (Vitest — when added)
+- `lib/ai/pipeline.ts` — mock Anthropic SDK, test plan/generate/validate flow
+- `lib/ai/techniqueMap.ts` — concept-to-technique mapping
+- `lib/graph/layout.ts` — d3-force config produces valid positions
+- `lib/db/schema.ts` — Drizzle schema matches expected shape
+- Store actions — Zustand store state transitions
+
+### Integration Tests
+- API routes — test with real DB (Docker postgres), verify response shapes
+- AI generation → DB storage → API retrieval → VizRenderer round-trip
+
+### E2E Tests (Playwright — when added)
+- Load canvas, verify nodes render
+- Click concept → modal opens → visualization renders in iframe
+- Search for concept → navigate to it
+- Expand concept → new nodes appear on canvas
+
+### What NOT to Test
+- React Flow internals (library responsibility)
+- Tailwind class output (visual, not logical)
+- Third-party SDK behavior
+
+## Performance Budgets
+
+| Metric | Target |
+|--------|--------|
+| Canvas initial load (50 nodes) | < 2s |
+| Node click → modal open | < 200ms |
+| AI viz generation (full pipeline) | < 30s |
+| SSE first event (generation start) | < 1s |
+| Viewport pan (re-fetch nodes) | < 500ms |
+| d3-force layout (100 nodes) | < 1s |
+| Bundle size (client JS) | < 300KB gzipped |
+
+## Git Workflow
+
+- Branch naming: `feat/`, `fix/`, `refactor/`, `docs/` prefixes
+- Commit messages: imperative mood, describe the "why"
+- Run `/review-pr` before merging
+- Database migrations get their own commit
+- Never commit `.env` — use `.env.example` for templates
