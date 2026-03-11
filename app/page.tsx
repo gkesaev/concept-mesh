@@ -1,6 +1,7 @@
 import { MeshCanvas } from '@/components/canvas/MeshCanvas'
 import { ConceptModal } from '@/components/concept/ConceptModal'
 import { SerendipityBanner } from '@/components/serendipity/SerendipityBanner'
+import { UserMenu } from '@/components/auth/UserMenu'
 import type { MeshData } from '@/types/concept'
 
 async function getMeshData(): Promise<MeshData> {
@@ -20,6 +21,9 @@ export default async function Home() {
 
   return (
     <main style={{ width: '100vw', height: '100vh', overflow: 'hidden', background: '#0a0f1e' }}>
+      <div className="absolute top-4 right-4 z-50">
+        <UserMenu />
+      </div>
       <MeshCanvas initialData={meshData} />
       <ConceptModal />
       <SerendipityBanner />
