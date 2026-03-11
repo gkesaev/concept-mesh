@@ -1,8 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { planningPrompt, generationPrompt, fixPrompt } from './prompts'
-
-const client = new Anthropic()
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5'
+import { MODEL } from './client'
 
 export type ProgressEvent =
   | { type: 'progress'; message: string }
@@ -29,7 +27,8 @@ export async function* generateVisualizationPipeline(
   conceptId: string,
   conceptName: string,
   domain: string,
-  explanation: string
+  explanation: string,
+  client: Anthropic
 ): AsyncGenerator<ProgressEvent> {
   // Shot 1: Planning
   yield { type: 'progress', message: 'Planning visualization...' }

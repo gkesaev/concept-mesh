@@ -2,10 +2,8 @@ import { NextRequest } from 'next/server'
 import { db } from '@/lib/db/client'
 import { concepts, connections } from '@/lib/db/schema'
 import { expandConceptPrompt } from '@/lib/ai/prompts'
-import Anthropic from '@anthropic-ai/sdk'
-
-const client = new Anthropic()
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5'
+import { getAnthropicClient, MODEL } from '@/lib/ai/client'
+import type Anthropic from '@anthropic-ai/sdk'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -31,6 +29,8 @@ export async function POST(_req: NextRequest, { params }: Params) {
           controller.close()
           return
         }
+
+        const client = await getAnthropicClient()
 
         send({ type: 'progress', message: 'Discovering related concepts...' })
 

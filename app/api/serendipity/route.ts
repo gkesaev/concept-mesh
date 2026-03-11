@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
 import { concepts, connections } from '@/lib/db/schema'
-import { eq, or, sql } from 'drizzle-orm'
 import { serendipityPrompt } from '@/lib/ai/prompts'
-import Anthropic from '@anthropic-ai/sdk'
-
-const client = new Anthropic()
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5'
+import { getAnthropicClient, MODEL } from '@/lib/ai/client'
+import type Anthropic from '@anthropic-ai/sdk'
 
 // GET /api/serendipity — find an unexpected connection between two unconnected concepts
 export async function GET() {
@@ -31,6 +28,8 @@ export async function GET() {
     const connectedPairs = new Set(
       allConnections.flatMap(c => [`${c.sourceId}:${c.targetId}`, `${c.targetId}:${c.sourceId}`])
     )
+
+    const client = await getAnthropicClient()
 
     // Find unconnected pairs (try up to 10 random pairs)
     for (let attempt = 0; attempt < 10; attempt++) {

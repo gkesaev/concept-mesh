@@ -4,10 +4,8 @@ import { concepts, visualizations } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { generateVisualizationPipeline } from '@/lib/ai/pipeline'
 import { metadataPrompt } from '@/lib/ai/prompts'
-import Anthropic from '@anthropic-ai/sdk'
-
-const client = new Anthropic()
-const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5'
+import { getAnthropicClient, MODEL } from '@/lib/ai/client'
+import type Anthropic from '@anthropic-ai/sdk'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -25,6 +23,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       const send = (event: object) => controller.enqueue(new TextEncoder().encode(sseMessage(event)))
 
       try {
+        const client = await getAnthropicClient()
+
         // Get or create concept metadata
         let concept = await db.query.concepts.findFirst({
           where: (c, { eq }) => eq(c.id, id),
@@ -68,7 +68,8 @@ export async function POST(req: NextRequest, { params }: Params) {
           concept.id,
           concept.name,
           concept.domain,
-          concept.explanation
+          concept.explanation,
+          client
         )) {
           if (event.type === 'error') {
             send(event)
