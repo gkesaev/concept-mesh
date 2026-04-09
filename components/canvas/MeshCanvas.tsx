@@ -29,8 +29,7 @@ function buildNodes(data: MeshData, positions: Map<string, { x: number; y: numbe
     position: positions.get(c.id) ?? { x: 0, y: 0 },
     data: {
       concept: c,
-      visualization: c.visualization ?? null,
-      status: c.visualization ? 'explored' : 'unexplored',
+      status: 'unexplored',
     },
   }))
 }

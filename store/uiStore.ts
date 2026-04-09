@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ConceptWithVisualization } from '@/types/concept'
+import type { Concept } from '@/types/concept'
 
 interface SerendipityBanner {
   sourceName: string
@@ -11,12 +11,12 @@ interface SerendipityBanner {
 
 interface UIState {
   selectedConceptId: string | null
-  modalConcept: ConceptWithVisualization | null
+  modalConcept: Concept | null
   searchQuery: string
   serendipityBanner: SerendipityBanner | null
 
   selectConcept: (id: string | null) => void
-  openModal: (concept: ConceptWithVisualization) => void
+  openModal: (concept: Concept) => void
   closeModal: () => void
   setSearchQuery: (q: string) => void
   showSerendipity: (banner: SerendipityBanner) => void
