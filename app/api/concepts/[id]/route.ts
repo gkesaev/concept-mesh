@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
-import { concepts, visualizations } from '@/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { concepts } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -17,13 +17,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
 
-    const [viz] = await db
-      .select()
-      .from(visualizations)
-      .where(and(eq(visualizations.conceptId, id), eq(visualizations.isActive, true)))
-      .limit(1)
-
-    return NextResponse.json({ ...concept, visualization: viz ?? null })
+    return NextResponse.json(concept)
   } catch (error) {
     console.error(`GET /api/concepts/${id} error:`, error)
     return NextResponse.json({ error: 'Failed to fetch concept' }, { status: 500 })

@@ -1,11 +1,10 @@
 import type { Node, Edge } from '@xyflow/react'
-import type { Concept, Visualization } from './concept'
+import type { Concept } from './concept'
 
 export type ConceptNodeStatus = 'unexplored' | 'generating' | 'explored' | 'error'
 
 export interface ConceptNodeData extends Record<string, unknown> {
   concept: Concept
-  visualization: Visualization | null
   status: ConceptNodeStatus
 }
 

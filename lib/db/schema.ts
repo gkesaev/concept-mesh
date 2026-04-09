@@ -102,18 +102,6 @@ export const connections = pgTable('connections', {
   index('connections_target_idx').on(t.targetId),
 ])
 
-export const visualizations = pgTable('visualizations', {
-  id:        uuid('id').primaryKey().defaultRandom(),
-  conceptId: text('concept_id').references(() => concepts.id, { onDelete: 'cascade' }).notNull(),
-  code:      text('code').notNull(),
-  plan:      text('plan'),
-  version:   integer('version').default(1).notNull(),
-  isActive:  boolean('is_active').default(true).notNull(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (t) => [
-  index('viz_concept_idx').on(t.conceptId),
-])
-
 export const nodePositions = pgTable('node_positions', {
   conceptId: text('concept_id').primaryKey().references(() => concepts.id, { onDelete: 'cascade' }),
   x:         real('x').notNull(),
@@ -124,6 +112,5 @@ export const nodePositions = pgTable('node_positions', {
 export type DbUser = typeof users.$inferSelect
 export type DbConcept = typeof concepts.$inferSelect
 export type DbConnection = typeof connections.$inferSelect
-export type DbVisualization = typeof visualizations.$inferSelect
 export type DbNodePosition = typeof nodePositions.$inferSelect
 export type DbFavorite = typeof favorites.$inferSelect

@@ -24,16 +24,6 @@ export interface Connection {
   createdAt: Date
 }
 
-export interface Visualization {
-  id: string
-  conceptId: string
-  code: string
-  plan: string | null
-  version: number
-  isActive: boolean
-  createdAt: Date
-}
-
 export interface NodePosition {
   conceptId: string
   x: number
@@ -41,12 +31,8 @@ export interface NodePosition {
   updatedAt: Date
 }
 
-export interface ConceptWithVisualization extends Concept {
-  visualization: Visualization | null
-}
-
 export interface MeshData {
-  concepts: ConceptWithVisualization[]
+  concepts: Concept[]
   connections: Connection[]
   positions: NodePosition[]
 }

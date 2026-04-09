@@ -30,7 +30,7 @@ const STATUS_STYLES = {
 
 export const ConceptNode = memo(function ConceptNode({ data, selected }: NodeProps<ConceptNodeType>) {
   const zoom = useStore(s => s.transform[2])
-  const { concept, status, visualization } = data as { concept: ConceptNodeType['data']['concept'], status: ConceptNodeStatus, visualization: ConceptNodeType['data']['visualization'] }
+  const { concept, status } = data as { concept: ConceptNodeType['data']['concept'], status: ConceptNodeStatus }
   const openModal = useUIStore(s => s.openModal)
   const selectConcept = useUIStore(s => s.selectConcept)
 
@@ -39,10 +39,8 @@ export const ConceptNode = memo(function ConceptNode({ data, selected }: NodePro
 
   const handleClick = useCallback(() => {
     selectConcept(concept.id)
-    if (visualization || status === 'explored') {
-      openModal({ ...concept, visualization: visualization ?? null })
-    }
-  }, [concept, visualization, status, openModal, selectConcept])
+    openModal(concept)
+  }, [concept, openModal, selectConcept])
 
   // Cluster view — tiny dot
   if (zoom < ZOOM_CLUSTER) {
@@ -173,7 +171,7 @@ export const ConceptNode = memo(function ConceptNode({ data, selected }: NodePro
             color: '#475569',
             textAlign: 'center',
           }}>
-            click to generate visualization
+            click to open
           </div>
         )}
       </div>
