@@ -7,9 +7,6 @@ export default {
     GitHub({ allowDangerousEmailAccountLinking: true }),
     Google({ allowDangerousEmailAccountLinking: true }),
   ],
-  session: {
-    strategy: 'jwt',
-  },
   pages: {
     signIn: '/auth/signin',
   },
