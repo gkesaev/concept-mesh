@@ -31,5 +31,11 @@ export async function getAnthropicClient(): Promise<Anthropic> {
     return new Anthropic()
   }
 
+  // Operator-level default (DEFAULT_PROVIDER / DEFAULT_API_KEY)
+  const defaultProvider = process.env.DEFAULT_PROVIDER || 'anthropic'
+  if (defaultProvider === 'anthropic' && process.env.DEFAULT_API_KEY) {
+    return new Anthropic({ apiKey: process.env.DEFAULT_API_KEY })
+  }
+
   throw new Error('No API key available. Please add your Anthropic API key in settings.')
 }

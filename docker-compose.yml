@@ -29,6 +29,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: ${PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD:-0}
     command: sh -c "npx drizzle-kit migrate && npm run db:seed"
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-concept}:${POSTGRES_PASSWORD:-concept}@db:5432/${POSTGRES_DB:-conceptmesh}
@@ -42,25 +44,32 @@ services:
 
   # ──────────────────────────────────────────────────────────
   # Next.js app — development with hot reload
+  # Also runs the Playwright-based card validation pipeline,
+  # so the container needs Chromium system libraries and a
+  # persistent browser cache.
   # ──────────────────────────────────────────────────────────
   app:
     build:
       context: .
       dockerfile: Dockerfile.dev
+      args:
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: ${PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD:-0}
     restart: unless-stopped
     ports:
       - "3000:3000"
+    # Chromium needs more than the default 64MB of /dev/shm.
+    shm_size: "1gb"
+    # Load secrets and provider keys directly from .env.local so
+    # bare ${VAR} expansion isn't needed for each one.
+    env_file:
+      - path: .env.local
+        required: false
     environment:
+      # These need compose-level construction or container-specific values,
+      # so they stay explicit. Everything else comes from env_file above.
       DATABASE_URL: postgresql://${POSTGRES_USER:-concept}:${POSTGRES_PASSWORD:-concept}@db:5432/${POSTGRES_DB:-conceptmesh}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-5}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
-      AUTH_SECRET: ${AUTH_SECRET}
-      AUTH_GITHUB_ID: ${AUTH_GITHUB_ID}
-      AUTH_GITHUB_SECRET: ${AUTH_GITHUB_SECRET}
-      AUTH_GOOGLE_ID: ${AUTH_GOOGLE_ID}
-      AUTH_GOOGLE_SECRET: ${AUTH_GOOGLE_SECRET}
-      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
     volumes:
       # Bind-mount source for hot reload
       - .:/app
@@ -68,6 +77,8 @@ services:
       - /app/node_modules
       # Persist Next.js build cache between restarts
       - nextjs_cache:/app/.next
+      # Persist Playwright browser downloads
+      - playwright_cache:/ms-playwright
     depends_on:
       db:
         condition: service_healthy
@@ -81,3 +92,4 @@ services:
 volumes:
   postgres_data:
   nextjs_cache:
+  playwright_cache:
