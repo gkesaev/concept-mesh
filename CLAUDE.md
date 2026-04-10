@@ -335,7 +335,18 @@ Custom slash commands for quality gates. Run these before merging any PR or afte
 ## Git Workflow
 
 - Branch naming: `feat/`, `fix/`, `refactor/`, `docs/` prefixes
-- Commit messages: imperative mood, describe the "why"
+- **Semantic commits** (Conventional Commits format):
+  - `feat: add concept expansion API` — new feature (minor version bump)
+  - `fix: prevent duplicate connections` — bug fix (patch version bump)
+  - `refactor: extract layout logic to worker` — code restructuring, no behavior change
+  - `docs: update API endpoint table` — documentation only
+  - `chore: upgrade drizzle-orm to 0.35` — dependencies, config, tooling
+  - `style: align Tailwind class ordering` — formatting, no logic change
+  - `perf: virtualize off-screen nodes` — performance improvement
+  - `test: add pipeline unit tests` — adding or updating tests
+  - Use optional scope for context: `feat(canvas): add pinch-to-zoom`
+  - Breaking changes: add `!` suffix — `feat(api)!: change mesh endpoint response shape`
+  - Body (optional): imperative mood, describe the "why" not the "what"
 - Run `/review-pr` before merging
-- Database migrations get their own commit
-- Never commit `.env` — use `.env.example` for templates
+- Database migrations get their own commit with `feat(db):` or `fix(db):` prefix
+- Never commit `.env` — use `.env.local.example` for templates
