@@ -14,8 +14,9 @@ services:
       args:
         NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://yourdomain.com}
     restart: always
-    # No source bind-mounts in production
-    volumes: []
+    # No source bind-mounts in production — only persist data volumes
+    volumes:
+      - playwright_cache:/ms-playwright
     environment:
       NODE_ENV: production
 
