@@ -110,6 +110,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(edge, { status: 201 })
   } catch (error) {
+    // pg foreign_key_violation — concept deleted between check and insert
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: unknown }).code === '23503') {
+      return NextResponse.json({ error: `Concept(s) not found` }, { status: 404 })
+    }
     console.error('POST /api/connections error:', error)
     return NextResponse.json({ error: 'Failed to create connection' }, { status: 500 })
   }

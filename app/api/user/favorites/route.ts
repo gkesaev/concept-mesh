@@ -4,7 +4,7 @@ import { db } from '@/lib/db/client'
 import { concepts, favorites } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 
-// GET /api/user/favorites — list user's favorite concept IDs
+// GET /api/user/favorites — list user's favorite concept slugs
 export async function GET() {
   const session = await auth()
   const userId = session?.user?.id
