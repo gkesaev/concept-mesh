@@ -10,7 +10,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   const { id } = await params
   try {
     const concept = await db.query.concepts.findFirst({
-      where: (c, { eq }) => eq(c.id, id),
+      where: (c, { eq }) => eq(c.slug, id),
     })
 
     if (!concept) {
@@ -29,19 +29,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
   const { id } = await params
   try {
     const body = await req.json()
-    const { name, domain, explanation, difficulty, metadata } = body
+    const { title, domain, description } = body
 
     const [updated] = await db
       .update(concepts)
       .set({
-        ...(name && { name }),
+        ...(title && { title }),
         ...(domain && { domain }),
-        ...(explanation && { explanation }),
-        ...(difficulty !== undefined && { difficulty }),
-        ...(metadata !== undefined && { metadata }),
+        ...(description && { description }),
         updatedAt: new Date(),
       })
-      .where(eq(concepts.id, id))
+      .where(eq(concepts.slug, id))
       .returning()
 
     if (!updated) {
@@ -59,7 +57,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id } = await params
   try {
-    await db.delete(concepts).where(eq(concepts.id, id))
+    await db.delete(concepts).where(eq(concepts.slug, id))
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error(`DELETE /api/concepts/${id} error:`, error)

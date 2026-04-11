@@ -1,31 +1,59 @@
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced'
 
-export type ConnectionType = 'related' // extensible: 'prerequisite' | 'application' | 'contrast' | 'analogy'
+export type EdgeRelationship = 'related' | 'prerequisite' | 'application' | 'contrast' | 'analogy'
+
+export type CardStatus = 'draft' | 'validating' | 'published' | 'flagged'
 
 export interface Concept {
-  id: string
-  name: string
+  slug: string
+  title: string
   domain: string
-  explanation: string
-  difficulty: Difficulty | null
-  metadata: Record<string, unknown>
+  description: string
+  bestCardId: string | null
+  cardCount: number
   createdAt: Date
   updatedAt: Date
 }
 
-export interface Connection {
+export interface ConceptCard {
   id: string
-  sourceId: string
-  targetId: string
-  type: ConnectionType
-  strength: number
-  aiGenerated: boolean
+  slug: string
+  version: number
+  title: string
+  domain: string
+  description: string
+  tags: string[]
+  difficulty: Difficulty | null
+  html: string
+  thumbnail: string | null
+  interactivityLevel: number
+  status: CardStatus
+  validationRenders: boolean | null
+  validationHasInteractivity: boolean | null
+  validationScreenshotHash: string | null
+  authorId: string | null
+  generatedWith: string | null
+  generationPrompt: string | null
+  parentCardId: string | null
+  createdAt: Date
+  updatedAt: Date
+  upvotes: number
+  views: number
+  embedCount: number
+}
+
+export interface ConceptEdge {
+  id: string
+  sourceSlug: string
+  targetSlug: string
+  relationship: EdgeRelationship
   reason: string | null
+  aiGenerated: boolean
   createdAt: Date
 }
 
 export interface NodePosition {
-  conceptId: string
+  conceptSlug: string
   x: number
   y: number
   updatedAt: Date
@@ -33,6 +61,6 @@ export interface NodePosition {
 
 export interface MeshData {
   concepts: Concept[]
-  connections: Connection[]
+  edges: ConceptEdge[]
   positions: NodePosition[]
 }

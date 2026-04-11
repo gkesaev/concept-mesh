@@ -39,9 +39,9 @@ export function SerendipityBanner() {
             ✦ UNEXPECTED CONNECTION
           </div>
           <div style={{ fontSize: 13, color: '#e2e8f0', lineHeight: 1.6 }}>
-            <span style={{ color: '#c7d2fe', fontWeight: 600 }}>{serendipityBanner.sourceName}</span>
+            <span style={{ color: '#c7d2fe', fontWeight: 600 }}>{serendipityBanner.sourceTitle}</span>
             {' '}and{' '}
-            <span style={{ color: '#c7d2fe', fontWeight: 600 }}>{serendipityBanner.targetName}</span>
+            <span style={{ color: '#c7d2fe', fontWeight: 600 }}>{serendipityBanner.targetTitle}</span>
             {' '}are connected:{' '}
             <span style={{ color: '#94a3b8' }}>{serendipityBanner.reason}</span>
           </div>

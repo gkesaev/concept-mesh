@@ -2,20 +2,20 @@ import { create } from 'zustand'
 import type { Concept } from '@/types/concept'
 
 interface SerendipityBanner {
-  sourceName: string
-  targetName: string
-  sourceId: string
-  targetId: string
+  sourceTitle: string
+  targetTitle: string
+  sourceSlug: string
+  targetSlug: string
   reason: string
 }
 
 interface UIState {
-  selectedConceptId: string | null
+  selectedConceptSlug: string | null
   modalConcept: Concept | null
   searchQuery: string
   serendipityBanner: SerendipityBanner | null
 
-  selectConcept: (id: string | null) => void
+  selectConcept: (slug: string | null) => void
   openModal: (concept: Concept) => void
   closeModal: () => void
   setSearchQuery: (q: string) => void
@@ -24,12 +24,12 @@ interface UIState {
 }
 
 export const useUIStore = create<UIState>((set) => ({
-  selectedConceptId: null,
+  selectedConceptSlug: null,
   modalConcept: null,
   searchQuery: '',
   serendipityBanner: null,
 
-  selectConcept: (id) => set({ selectedConceptId: id }),
+  selectConcept: (slug) => set({ selectedConceptSlug: slug }),
   openModal: (concept) => set({ modalConcept: concept }),
   closeModal: () => set({ modalConcept: null }),
   setSearchQuery: (searchQuery) => set({ searchQuery }),

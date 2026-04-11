@@ -22,6 +22,20 @@
       "when": 1775773463136,
       "tag": "0002_drop_visualizations",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781308800000,
+      "tag": "0003_v2_concept_cards",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1781395200000,
+      "tag": "0004_concept_cards_slug_version_unique",
+      "breakpoints": true
     }
   ]
 }

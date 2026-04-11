@@ -5,7 +5,6 @@ import {
   boolean,
   integer,
   timestamp,
-  jsonb,
   uuid,
   unique,
   index,
@@ -24,7 +23,6 @@ export const users = pgTable('users', {
   email:         text('email').unique(),
   emailVerified: timestamp('email_verified', { mode: 'date' }),
   image:         text('image'),
-  // Encrypted Anthropic API key (AES-256-GCM, base64-encoded)
   encryptedApiKey: text('encrypted_api_key'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
 })
@@ -60,57 +58,104 @@ export const verificationTokens = pgTable('verification_tokens', {
 ])
 
 // ──────────────────────────────────────────────────────────
-// Favorites
-// ──────────────────────────────────────────────────────────
-
-export const favorites = pgTable('favorites', {
-  userId:    text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  conceptId: text('concept_id').notNull().references(() => concepts.id, { onDelete: 'cascade' }),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-}, (t) => [
-  primaryKey({ columns: [t.userId, t.conceptId] }),
-])
-
-// ──────────────────────────────────────────────────────────
 // Domain tables
 // ──────────────────────────────────────────────────────────
 
 export const concepts = pgTable('concepts', {
-  id:          text('id').primaryKey(),
-  name:        text('name').notNull(),
+  slug:        text('slug').primaryKey(),
+  title:       text('title').notNull(),
   domain:      text('domain').notNull(),
-  explanation: text('explanation').notNull(),
-  difficulty:  text('difficulty'),
-  metadata:    jsonb('metadata').$type<Record<string, unknown>>().default({}),
+  description: text('description').notNull(),
   embedding:   vector('embedding', { dimensions: 1536 }),
+  bestCardId:  uuid('best_card_id'),
+  cardCount:   integer('card_count').default(0).notNull(),
   createdAt:   timestamp('created_at').defaultNow().notNull(),
+  updatedAt:   timestamp('updated_at').defaultNow().notNull(),
+}, (t) => [
+  index('concepts_domain_idx').on(t.domain),
+])
+
+export const conceptCards = pgTable('concept_cards', {
+  id:   uuid('id').primaryKey().defaultRandom(),
+  slug: text('slug').notNull().references(() => concepts.slug, { onDelete: 'cascade' }),
+  version: integer('version').default(1).notNull(),
+
+  // Concept metadata (denormalized for card self-containedness)
+  title:       text('title').notNull(),
+  domain:      text('domain').notNull(),
+  description: text('description').notNull(),
+  tags:        text('tags').array().default([]).notNull(),
+  difficulty:  text('difficulty').$type<'beginner' | 'intermediate' | 'advanced'>(),
+
+  // Visualization
+  html:               text('html').notNull(),
+  thumbnail:          text('thumbnail'),
+  interactivityLevel: integer('interactivity_level').default(0).notNull(),
+
+  // Quality & status
+  status:                      text('status').$type<'draft' | 'validating' | 'published' | 'flagged'>().default('draft').notNull(),
+  validationRenders:           boolean('validation_renders'),
+  validationHasInteractivity:  boolean('validation_has_interactivity'),
+  validationScreenshotHash:    text('validation_screenshot_hash'),
+
+  // Provenance
+  authorId:         text('author_id').references(() => users.id, { onDelete: 'set null' }),
+  generatedWith:    text('generated_with'),
+  generationPrompt: text('generation_prompt'),
+  parentCardId:     uuid('parent_card_id'),
+  createdAt:        timestamp('created_at').defaultNow().notNull(),
+  updatedAt:        timestamp('updated_at').defaultNow().notNull(),
+
+  // Community
+  upvotes:    integer('upvotes').default(0).notNull(),
+  views:      integer('views').default(0).notNull(),
+  embedCount: integer('embed_count').default(0).notNull(),
+}, (t) => [
+  unique('concept_cards_slug_version').on(t.slug, t.version),
+  index('concept_cards_slug_idx').on(t.slug),
+  index('concept_cards_status_idx').on(t.status),
+])
+
+export const conceptEdges = pgTable('concept_edges', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  sourceSlug:   text('source_slug').notNull().references(() => concepts.slug, { onDelete: 'cascade' }),
+  targetSlug:   text('target_slug').notNull().references(() => concepts.slug, { onDelete: 'cascade' }),
+  relationship: text('relationship').$type<'related' | 'prerequisite' | 'application' | 'contrast' | 'analogy'>().default('related').notNull(),
+  reason:       text('reason'),
+  aiGenerated:  boolean('ai_generated').default(false).notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (t) => [
+  unique('unique_edge').on(t.sourceSlug, t.targetSlug),
+  index('concept_edges_source_idx').on(t.sourceSlug),
+  index('concept_edges_target_idx').on(t.targetSlug),
+])
+
+// ──────────────────────────────────────────────────────────
+// Supporting tables
+// ──────────────────────────────────────────────────────────
+
+export const nodePositions = pgTable('node_positions', {
+  conceptSlug: text('concept_slug').primaryKey().references(() => concepts.slug, { onDelete: 'cascade' }),
+  x:           real('x').notNull(),
+  y:           real('y').notNull(),
   updatedAt:   timestamp('updated_at').defaultNow().notNull(),
 })
 
-export const connections = pgTable('connections', {
-  id:          uuid('id').primaryKey().defaultRandom(),
-  sourceId:    text('source_id').references(() => concepts.id, { onDelete: 'cascade' }).notNull(),
-  targetId:    text('target_id').references(() => concepts.id, { onDelete: 'cascade' }).notNull(),
-  type:        text('type').default('related').notNull(),
-  strength:    real('strength').default(1.0).notNull(),
-  aiGenerated: boolean('ai_generated').default(false).notNull(),
-  reason:      text('reason'),
+export const favorites = pgTable('favorites', {
+  userId:      text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  conceptSlug: text('concept_slug').notNull().references(() => concepts.slug, { onDelete: 'cascade' }),
   createdAt:   timestamp('created_at').defaultNow().notNull(),
 }, (t) => [
-  unique('unique_connection').on(t.sourceId, t.targetId),
-  index('connections_source_idx').on(t.sourceId),
-  index('connections_target_idx').on(t.targetId),
+  primaryKey({ columns: [t.userId, t.conceptSlug] }),
 ])
 
-export const nodePositions = pgTable('node_positions', {
-  conceptId: text('concept_id').primaryKey().references(() => concepts.id, { onDelete: 'cascade' }),
-  x:         real('x').notNull(),
-  y:         real('y').notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+// ──────────────────────────────────────────────────────────
+// Type exports
+// ──────────────────────────────────────────────────────────
 
 export type DbUser = typeof users.$inferSelect
 export type DbConcept = typeof concepts.$inferSelect
-export type DbConnection = typeof connections.$inferSelect
+export type DbConceptCard = typeof conceptCards.$inferSelect
+export type DbConceptEdge = typeof conceptEdges.$inferSelect
 export type DbNodePosition = typeof nodePositions.$inferSelect
 export type DbFavorite = typeof favorites.$inferSelect

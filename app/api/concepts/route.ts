@@ -3,6 +3,10 @@ import { db } from '@/lib/db/client'
 import { concepts } from '@/lib/db/schema'
 import { ilike, or } from 'drizzle-orm'
 
+function escapeLikePattern(input: string): string {
+  return input.replace(/[%_\\]/g, '\\$&')
+}
+
 // GET /api/concepts?q=&domain=
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -11,24 +15,30 @@ export async function GET(req: NextRequest) {
 
   try {
     let query = db.select({
-      id: concepts.id,
-      name: concepts.name,
+      slug: concepts.slug,
+      title: concepts.title,
       domain: concepts.domain,
-      explanation: concepts.explanation,
-      difficulty: concepts.difficulty,
-      metadata: concepts.metadata,
+      description: concepts.description,
+      bestCardId: concepts.bestCardId,
+      cardCount: concepts.cardCount,
       createdAt: concepts.createdAt,
       updatedAt: concepts.updatedAt,
     }).from(concepts)
 
     if (q) {
+      const escaped = escapeLikePattern(q)
       query = query.where(
         or(
-          ilike(concepts.name, `%${q}%`),
-          ilike(concepts.explanation, `%${q}%`),
-          ilike(concepts.domain, `%${q}%`)
+          ilike(concepts.title, `%${escaped}%`),
+          ilike(concepts.description, `%${escaped}%`),
+          ilike(concepts.domain, `%${escaped}%`)
         )
       ) as typeof query
+    }
+
+    if (domain) {
+      const escapedDomain = escapeLikePattern(domain)
+      query = query.where(ilike(concepts.domain, `%${escapedDomain}%`)) as typeof query
     }
 
     const results = await query
@@ -43,24 +53,22 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { id, name, domain, explanation, difficulty, metadata } = body
+    const { slug, title, domain, description } = body
 
-    if (!id || !name || !domain || !explanation) {
-      return NextResponse.json({ error: 'id, name, domain, explanation are required' }, { status: 400 })
+    if (!slug || !title || !domain || !description) {
+      return NextResponse.json({ error: 'slug, title, domain, description are required' }, { status: 400 })
     }
 
+    // TODO: generate embedding vector for semantic search once embedding pipeline is built
     const [concept] = await db.insert(concepts).values({
-      id,
-      name,
+      slug,
+      title,
       domain,
-      explanation,
-      difficulty: difficulty ?? null,
-      metadata: metadata ?? {},
+      description,
     }).onConflictDoNothing().returning()
 
     if (!concept) {
-      // Concept already existed — return existing
-      const existing = await db.query.concepts.findFirst({ where: (c, { eq }) => eq(c.id, id) })
+      const existing = await db.query.concepts.findFirst({ where: (c, { eq }) => eq(c.slug, slug) })
       return NextResponse.json(existing, { status: 200 })
     }
 

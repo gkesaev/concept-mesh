@@ -27,6 +27,7 @@ const DOMAIN_ANGLES: Record<string, number> = {
 }
 
 const DOMAIN_RADIUS = 500
+const LINK_STRENGTH = 0.3
 
 function getDomainCenter(domain: string): { x: number; y: number } {
   const angle = DOMAIN_ANGLES[domain] ?? Math.random() * Math.PI * 2
@@ -63,7 +64,7 @@ export function computeLayout(
   const layoutLinks: LayoutLink[] = edges.map(e => ({
     source: e.source,
     target: e.target,
-    strength: (e.data?.strength ?? 1.0) * 0.3,
+    strength: LINK_STRENGTH,
   }))
 
   const simulation = d3.forceSimulation(unpinnedNodes as d3.SimulationNodeDatum[])

@@ -24,9 +24,9 @@ const edgeTypes: EdgeTypes = { connection: ConnectionEdge as EdgeTypes['connecti
 
 function buildNodes(data: MeshData, positions: Map<string, { x: number; y: number }>): ConceptNodeType[] {
   return data.concepts.map(c => ({
-    id: c.id,
+    id: c.slug,
     type: 'concept' as const,
-    position: positions.get(c.id) ?? { x: 0, y: 0 },
+    position: positions.get(c.slug) ?? { x: 0, y: 0 },
     data: {
       concept: c,
       status: 'unexplored',
@@ -35,16 +35,15 @@ function buildNodes(data: MeshData, positions: Map<string, { x: number; y: numbe
 }
 
 function buildEdges(data: MeshData): ConnectionEdgeType[] {
-  return data.connections.map(c => ({
-    id: c.id,
-    source: c.sourceId,
-    target: c.targetId,
+  return data.edges.map(e => ({
+    id: e.id,
+    source: e.sourceSlug,
+    target: e.targetSlug,
     type: 'connection' as const,
     data: {
-      type: c.type,
-      strength: c.strength,
-      reason: c.reason,
-      aiGenerated: c.aiGenerated,
+      relationship: e.relationship,
+      reason: e.reason,
+      aiGenerated: e.aiGenerated,
     },
   }))
 }
@@ -55,11 +54,11 @@ interface MeshCanvasProps {
 
 export function MeshCanvas({ initialData }: MeshCanvasProps) {
   const { nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges, setLayoutReady } = useMeshStore()
-  const { selectedConceptId, selectConcept } = useUIStore()
+  const { selectedConceptSlug, selectConcept } = useUIStore()
 
   // Initialize layout on mount
   useEffect(() => {
-    const positionMap = new Map(initialData.positions.map(p => [p.conceptId, { x: p.x, y: p.y }]))
+    const positionMap = new Map(initialData.positions.map(p => [p.conceptSlug, { x: p.x, y: p.y }]))
 
     const initialEdges = buildEdges(initialData)
     const initialNodes = buildNodes(initialData, positionMap)
@@ -88,7 +87,7 @@ export function MeshCanvas({ initialData }: MeshCanvasProps) {
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#0a0f1e' }}>
       <ReactFlow
-        nodes={nodes.map(n => ({ ...n, selected: n.id === selectedConceptId }))}
+        nodes={nodes.map(n => ({ ...n, selected: n.id === selectedConceptSlug }))}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
