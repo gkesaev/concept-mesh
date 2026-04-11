@@ -26,21 +26,61 @@ export async function GET(req: NextRequest) {
 }
 
 const VALID_RELATIONSHIPS = ['related', 'prerequisite', 'application', 'contrast', 'analogy'] as const
+type Relationship = typeof VALID_RELATIONSHIPS[number]
+
+function isRelationship(value: unknown): value is Relationship {
+  return typeof value === 'string' && (VALID_RELATIONSHIPS as readonly string[]).includes(value)
+}
 
 // POST /api/connections
 export async function POST(req: NextRequest) {
+  let body: unknown
   try {
-    const body = await req.json()
-    const { sourceSlug, targetSlug, relationship, reason, aiGenerated } = body
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
 
-    if (!sourceSlug || !targetSlug) {
-      return NextResponse.json({ error: 'sourceSlug and targetSlug are required' }, { status: 400 })
-    }
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Request body must be an object' }, { status: 400 })
+  }
 
-    if (relationship && !VALID_RELATIONSHIPS.includes(relationship)) {
+  const raw = body as Record<string, unknown>
+
+  if (typeof raw.sourceSlug !== 'string' || raw.sourceSlug.length === 0) {
+    return NextResponse.json({ error: 'sourceSlug must be a non-empty string' }, { status: 400 })
+  }
+  if (typeof raw.targetSlug !== 'string' || raw.targetSlug.length === 0) {
+    return NextResponse.json({ error: 'targetSlug must be a non-empty string' }, { status: 400 })
+  }
+  const sourceSlug: string = raw.sourceSlug
+  const targetSlug: string = raw.targetSlug
+
+  let relationship: Relationship = 'related'
+  if (raw.relationship !== undefined && raw.relationship !== null) {
+    if (!isRelationship(raw.relationship)) {
       return NextResponse.json({ error: `relationship must be one of: ${VALID_RELATIONSHIPS.join(', ')}` }, { status: 400 })
     }
+    relationship = raw.relationship
+  }
 
+  let reason: string | null = null
+  if (raw.reason !== undefined && raw.reason !== null) {
+    if (typeof raw.reason !== 'string') {
+      return NextResponse.json({ error: 'reason must be a string or null' }, { status: 400 })
+    }
+    reason = raw.reason
+  }
+
+  let aiGenerated = false
+  if (raw.aiGenerated !== undefined) {
+    if (typeof raw.aiGenerated !== 'boolean') {
+      return NextResponse.json({ error: 'aiGenerated must be a boolean' }, { status: 400 })
+    }
+    aiGenerated = raw.aiGenerated
+  }
+
+  try {
     // Validate that both concepts exist before inserting
     const existing = await db
       .select({ slug: concepts.slug })
@@ -57,9 +97,9 @@ export async function POST(req: NextRequest) {
       .values({
         sourceSlug,
         targetSlug,
-        relationship: relationship ?? 'related',
-        reason: reason ?? null,
-        aiGenerated: aiGenerated ?? false,
+        relationship,
+        reason,
+        aiGenerated,
       })
       .onConflictDoNothing()
       .returning()

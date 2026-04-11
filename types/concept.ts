@@ -11,8 +11,8 @@ export interface Concept {
   description: string
   bestCardId: string | null
   cardCount: number
-  createdAt: Date
-  updatedAt: Date
+  createdAt: string
+  updatedAt: string
 }
 
 export interface ConceptCard {
@@ -35,8 +35,8 @@ export interface ConceptCard {
   generatedWith: string | null
   generationPrompt: string | null
   parentCardId: string | null
-  createdAt: Date
-  updatedAt: Date
+  createdAt: string
+  updatedAt: string
   upvotes: number
   views: number
   embedCount: number
@@ -49,14 +49,14 @@ export interface ConceptEdge {
   relationship: EdgeRelationship
   reason: string | null
   aiGenerated: boolean
-  createdAt: Date
+  createdAt: string
 }
 
 export interface NodePosition {
   conceptSlug: string
   x: number
   y: number
-  updatedAt: Date
+  updatedAt: string
 }
 
 export interface MeshData {

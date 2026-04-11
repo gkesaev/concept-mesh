@@ -10,6 +10,7 @@ import {
   index,
   vector,
   primaryKey,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 import type { AdapterAccountType } from 'next-auth/adapters'
 
@@ -67,7 +68,7 @@ export const concepts = pgTable('concepts', {
   domain:      text('domain').notNull(),
   description: text('description').notNull(),
   embedding:   vector('embedding', { dimensions: 1536 }),
-  bestCardId:  uuid('best_card_id'),
+  bestCardId:  uuid('best_card_id').references((): AnyPgColumn => conceptCards.id, { onDelete: 'set null' }),
   cardCount:   integer('card_count').default(0).notNull(),
   createdAt:   timestamp('created_at').defaultNow().notNull(),
   updatedAt:   timestamp('updated_at').defaultNow().notNull(),
@@ -102,7 +103,7 @@ export const conceptCards = pgTable('concept_cards', {
   authorId:         text('author_id').references(() => users.id, { onDelete: 'set null' }),
   generatedWith:    text('generated_with'),
   generationPrompt: text('generation_prompt'),
-  parentCardId:     uuid('parent_card_id'),
+  parentCardId:     uuid('parent_card_id').references((): AnyPgColumn => conceptCards.id, { onDelete: 'set null' }),
   createdAt:        timestamp('created_at').defaultNow().notNull(),
   updatedAt:        timestamp('updated_at').defaultNow().notNull(),
 

@@ -36,6 +36,13 @@
       "when": 1781395200000,
       "tag": "0004_concept_cards_slug_version_unique",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1781481600000,
+      "tag": "0005_card_fk_constraints",
+      "breakpoints": true
     }
   ]
 }
