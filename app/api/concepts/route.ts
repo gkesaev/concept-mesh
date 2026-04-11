@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
 import { concepts } from '@/lib/db/schema'
-import { ilike, or } from 'drizzle-orm'
+import { ilike, or, and, type SQL } from 'drizzle-orm'
 
 function escapeLikePattern(input: string): string {
   return input.replace(/[%_\\]/g, '\\$&')
@@ -25,20 +25,26 @@ export async function GET(req: NextRequest) {
       updatedAt: concepts.updatedAt,
     }).from(concepts)
 
+    const filters: SQL[] = []
+
     if (q) {
       const escaped = escapeLikePattern(q)
-      query = query.where(
-        or(
-          ilike(concepts.title, `%${escaped}%`),
-          ilike(concepts.description, `%${escaped}%`),
-          ilike(concepts.domain, `%${escaped}%`)
-        )
-      ) as typeof query
+      const condition = or(
+        ilike(concepts.title, `%${escaped}%`),
+        ilike(concepts.description, `%${escaped}%`),
+        ilike(concepts.domain, `%${escaped}%`)
+      )
+      if (condition) filters.push(condition)
     }
 
     if (domain) {
       const escapedDomain = escapeLikePattern(domain)
-      query = query.where(ilike(concepts.domain, `%${escapedDomain}%`)) as typeof query
+      filters.push(ilike(concepts.domain, `%${escapedDomain}%`))
+    }
+
+    if (filters.length > 0) {
+      const combined = filters.length === 1 ? filters[0] : and(...filters)
+      if (combined) query = query.where(combined) as typeof query
     }
 
     const results = await query
