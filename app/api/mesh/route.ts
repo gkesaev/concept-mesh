@@ -1,31 +1,31 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
-import { concepts, connections, nodePositions } from '@/lib/db/schema'
+import { concepts, conceptEdges, nodePositions } from '@/lib/db/schema'
 
-// GET /api/mesh — bulk fetch all concepts + connections + positions
+// GET /api/mesh — bulk fetch all concepts + edges + positions
 // Used for initial canvas hydration
 export async function GET() {
   try {
-    const [allConcepts, allConnections, allPositions] = await Promise.all([
+    const [allConcepts, allEdges, allPositions] = await Promise.all([
       db.select({
-        id: concepts.id,
-        name: concepts.name,
+        slug: concepts.slug,
+        title: concepts.title,
         domain: concepts.domain,
-        explanation: concepts.explanation,
-        difficulty: concepts.difficulty,
-        metadata: concepts.metadata,
+        description: concepts.description,
+        bestCardId: concepts.bestCardId,
+        cardCount: concepts.cardCount,
         createdAt: concepts.createdAt,
         updatedAt: concepts.updatedAt,
       }).from(concepts),
 
-      db.select().from(connections),
+      db.select().from(conceptEdges),
 
       db.select().from(nodePositions),
     ])
 
     return NextResponse.json({
       concepts: allConcepts,
-      connections: allConnections,
+      edges: allEdges,
       positions: allPositions,
     })
   } catch (error) {

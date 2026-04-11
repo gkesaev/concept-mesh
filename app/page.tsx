@@ -12,7 +12,7 @@ async function getMeshData(): Promise<MeshData> {
     return res.json()
   } catch {
     // Return empty mesh if DB isn't ready yet
-    return { concepts: [], connections: [], positions: [] }
+    return { concepts: [], edges: [], positions: [] }
   }
 }
 

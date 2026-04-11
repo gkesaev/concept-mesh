@@ -17,13 +17,12 @@ export const ConnectionEdge = memo(function ConnectionEdge({
   const [edgePath, labelX, labelY] = getStraightPath({ sourceX, sourceY, targetX, targetY })
 
   const edgeData = data as ConnectionEdgeType['data'] | undefined
-  const strength = edgeData?.strength ?? 1.0
   const aiGenerated = edgeData?.aiGenerated ?? false
   const reason = edgeData?.reason
 
   const strokeColor = aiGenerated ? '#a855f7' : '#6366f1'
-  const strokeWidth = 0.5 + strength * 1.5
-  const opacity = selected ? 0.9 : 0.3 + strength * 0.3
+  const strokeWidth = 2
+  const opacity = selected ? 0.9 : 0.5
 
   return (
     <>

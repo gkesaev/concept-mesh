@@ -38,7 +38,7 @@ export const ConceptNode = memo(function ConceptNode({ data, selected }: NodePro
   const style = STATUS_STYLES[status as keyof typeof STATUS_STYLES] ?? STATUS_STYLES.unexplored
 
   const handleClick = useCallback(() => {
-    selectConcept(concept.id)
+    selectConcept(concept.slug)
     openModal(concept)
   }, [concept, openModal, selectConcept])
 
@@ -80,7 +80,7 @@ export const ConceptNode = memo(function ConceptNode({ data, selected }: NodePro
           }}
         >
           <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', marginBottom: 4 }}>
-            {concept.name}
+            {concept.title}
           </div>
           <div style={{
             fontSize: 10,
@@ -135,7 +135,7 @@ export const ConceptNode = memo(function ConceptNode({ data, selected }: NodePro
         }} />
 
         <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', marginBottom: 6, paddingRight: 16 }}>
-          {concept.name}
+          {concept.title}
         </div>
 
         <div style={{
@@ -150,7 +150,7 @@ export const ConceptNode = memo(function ConceptNode({ data, selected }: NodePro
           {concept.domain}
         </div>
 
-        {concept.explanation && (
+        {concept.description && (
           <div style={{
             fontSize: 11,
             color: '#94a3b8',
@@ -160,7 +160,7 @@ export const ConceptNode = memo(function ConceptNode({ data, selected }: NodePro
             WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
           }}>
-            {concept.explanation}
+            {concept.description}
           </div>
         )}
 

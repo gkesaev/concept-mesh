@@ -49,7 +49,7 @@ export function ConceptModal() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
           <div>
             <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#e2e8f0', margin: 0, marginBottom: 4 }}>
-              {modalConcept.name}
+              {modalConcept.title}
             </h2>
             <span style={{
               fontSize: 11,
@@ -88,7 +88,7 @@ export function ConceptModal() {
           color: '#cbd5e1',
           lineHeight: 1.7,
         }}>
-          {modalConcept.explanation}
+          {modalConcept.description}
         </div>
 
         {/* Card placeholder — the card viewer arrives with the new generation pipeline */}
