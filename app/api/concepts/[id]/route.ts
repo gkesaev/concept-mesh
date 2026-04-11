@@ -57,7 +57,13 @@ export async function PUT(req: NextRequest, { params }: Params) {
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id } = await params
   try {
-    await db.delete(concepts).where(eq(concepts.slug, id))
+    const deleted = await db
+      .delete(concepts)
+      .where(eq(concepts.slug, id))
+      .returning({ slug: concepts.slug })
+    if (deleted.length === 0) {
+      return NextResponse.json({ error: 'Concept not found' }, { status: 404 })
+    }
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error(`DELETE /api/concepts/${id} error:`, error)

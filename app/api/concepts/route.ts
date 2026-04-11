@@ -57,12 +57,25 @@ export async function GET(req: NextRequest) {
 
 // POST /api/concepts — create a new concept
 export async function POST(req: NextRequest) {
+  let body: unknown
   try {
-    const body = await req.json()
-    const { slug, title, domain, description } = body
+    body = await req.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  if (!body || typeof body !== 'object') {
+    return NextResponse.json({ error: 'Request body must be an object' }, { status: 400 })
+  }
+
+  try {
+    const { slug, title, domain, description } = body as Record<string, unknown>
 
     if (!slug || !title || !domain || !description) {
       return NextResponse.json({ error: 'slug, title, domain, description are required' }, { status: 400 })
+    }
+    if (typeof slug !== 'string' || typeof title !== 'string' || typeof domain !== 'string' || typeof description !== 'string') {
+      return NextResponse.json({ error: 'slug, title, domain, description must be strings' }, { status: 400 })
     }
 
     // TODO: generate embedding vector for semantic search once embedding pipeline is built

@@ -31,7 +31,11 @@ CREATE INDEX "concepts_domain_idx" ON "concepts" USING btree ("domain");
 -- 2. Reshape node_positions: rename concept_id → concept_slug
 -- ────────────────────────────────────────────────────────
 
+ALTER TABLE "node_positions" DROP CONSTRAINT IF EXISTS "node_positions_concept_id_concepts_id_fk";
+--> statement-breakpoint
 ALTER TABLE "node_positions" RENAME COLUMN "concept_id" TO "concept_slug";
+--> statement-breakpoint
+ALTER TABLE "node_positions" ADD CONSTRAINT "node_positions_concept_slug_concepts_slug_fk" FOREIGN KEY ("concept_slug") REFERENCES "public"."concepts"("slug") ON DELETE cascade ON UPDATE no action;
 --> statement-breakpoint
 
 -- ────────────────────────────────────────────────────────
