@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Compound Interest</title>
+    <style>
+      :root {
+        --cm-bg: #0b1020;
+        --cm-surface: #141a2e;
+        --cm-text: #e8ecff;
+        --cm-accent: #7c5cff;
+        --cm-border: #2a3150;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: var(--cm-bg);
+        color: var(--cm-text);
+        font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+      }
+      main { padding: 24px; max-width: 560px; margin: 0 auto; }
+      h1 { font-size: 18px; font-weight: 600; margin: 0 0 16px; }
+      .panel {
+        background: var(--cm-surface);
+        border: 1px solid var(--cm-border);
+        border-radius: 12px;
+        padding: 16px;
+        display: grid;
+        gap: 12px;
+      }
+      .row { display: grid; grid-template-columns: 110px 1fr 80px; align-items: center; gap: 12px; }
+      label { font-size: 13px; }
+      output { font-variant-numeric: tabular-nums; text-align: right; color: var(--cm-accent); font-weight: 600; }
+      input[type="range"] {
+        -webkit-appearance: none; appearance: none;
+        height: 4px; background: var(--cm-border); border-radius: 2px; outline: none;
+      }
+      input[type="range"]:focus-visible { box-shadow: 0 0 0 2px var(--cm-accent); }
+      input[type="range"]::-webkit-slider-thumb {
+        -webkit-appearance: none; appearance: none;
+        width: 16px; height: 16px; border-radius: 50%;
+        background: var(--cm-accent); cursor: pointer; border: 0;
+      }
+      input[type="range"]::-moz-range-thumb {
+        width: 16px; height: 16px; border-radius: 50%;
+        background: var(--cm-accent); cursor: pointer; border: 0;
+      }
+      .result {
+        margin-top: 8px; padding-top: 12px;
+        border-top: 1px solid var(--cm-border);
+        display: flex; justify-content: space-between; align-items: baseline;
+      }
+      .result-value { font-size: 24px; font-weight: 700; color: var(--cm-accent); font-variant-numeric: tabular-nums; }
+      .hint { color: color-mix(in srgb, var(--cm-text) 65%, transparent); font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main aria-labelledby="title">
+      <h1 id="title">Compound Interest</h1>
+      <p class="hint">A = P (1 + r/n)<sup>nt</sup>. Adjust the sliders to see how principal, rate, and time compound.</p>
+      <form class="panel" aria-label="Compound interest calculator">
+        <div class="row">
+          <label for="p">Principal</label>
+          <input id="p" type="range" min="100" max="100000" step="100" value="1000" />
+          <output id="p-out" for="p">$1,000</output>
+        </div>
+        <div class="row">
+          <label for="r">Rate (%/yr)</label>
+          <input id="r" type="range" min="0" max="20" step="0.1" value="5" />
+          <output id="r-out" for="r">5.0%</output>
+        </div>
+        <div class="row">
+          <label for="t">Years</label>
+          <input id="t" type="range" min="1" max="50" step="1" value="10" />
+          <output id="t-out" for="t">10</output>
+        </div>
+        <div class="result" aria-live="polite">
+          <span>Final balance</span>
+          <span class="result-value" id="total">$1,628.89</span>
+        </div>
+      </form>
+    </main>
+    <script>
+      (function () {
+        var P = document.getElementById('p');
+        var R = document.getElementById('r');
+        var T = document.getElementById('t');
+        var pOut = document.getElementById('p-out');
+        var rOut = document.getElementById('r-out');
+        var tOut = document.getElementById('t-out');
+        var total = document.getElementById('total');
+        var fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+
+        function update() {
+          var p = +P.value, r = +R.value / 100, t = +T.value, n = 12;
+          var a = p * Math.pow(1 + r / n, n * t);
+          pOut.textContent = fmt.format(p);
+          rOut.textContent = (+R.value).toFixed(1) + '%';
+          tOut.textContent = t;
+          total.textContent = fmt.format(a);
+        }
+        [P, R, T].forEach(function (el) { el.addEventListener('input', update); });
+        update();
+      })();
+    </script>
+  </body>
+</html>
