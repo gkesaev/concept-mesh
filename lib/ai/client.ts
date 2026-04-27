@@ -3,7 +3,8 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db/client'
 import { decrypt } from '@/lib/crypto'
 
-export const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5'
+// Default to the latest Sonnet. Override via ANTHROPIC_MODEL.
+export const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-6'
 
 /**
  * Get an Anthropic client using the authenticated user's API key.

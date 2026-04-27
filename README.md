@@ -73,7 +73,7 @@ All variables are documented in `.env.local.example`. The important ones:
 | `DEFAULT_PROVIDER` | Server fallback provider: `anthropic` \| `openai` \| `openai-compat` |
 | `DEFAULT_API_KEY` | Server fallback API key (encrypted in memory before use) |
 | `ANTHROPIC_API_KEY` | Legacy single-provider fallback, still honoured |
-| `ANTHROPIC_MODEL` | Model id (default `claude-sonnet-4-5`) |
+| `ANTHROPIC_MODEL` | Model id (default `claude-sonnet-4-6`) |
 | `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD` | Set to `1` in CI to skip browser install during `npm ci` |
 | `NEXT_PUBLIC_APP_URL` | Public base URL of the app |
 

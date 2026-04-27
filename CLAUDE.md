@@ -18,7 +18,9 @@ This is NOT a learning management system. It is a personal/shared exploration to
 | Database | PostgreSQL + pgvector (Neon) | MIT-compatible |
 | ORM | Drizzle ORM | MIT |
 | AI | @anthropic-ai/sdk (server-side only) | MIT |
-| Viz Sandboxing | iframe sandbox with injected React runtime | N/A |
+| Auth | NextAuth.js v5 (GitHub / Google) + Drizzle adapter | ISC / MIT |
+| Viz Sandboxing | self-contained HTML in iframe `sandbox="allow-scripts"` (srcdoc) | N/A |
+| Card Validation | static checks now, Playwright headless render planned | Apache-2.0 |
 
 **All dependencies MUST have MIT, ISC, Apache-2.0, or BSD licenses. No GPL. Check before adding.**
 
@@ -37,10 +39,16 @@ This is NOT a learning management system. It is a personal/shared exploration to
 - Multi-shot pipeline: Plan → Generate → Validate (local) → Fix (if needed) → Save to DB.
 
 ### Generated Visualizations are Sandboxed
-- AI-generated visualization code is a string containing a React arrow function using React.createElement (NO JSX).
-- Code runs inside an iframe sandbox with `sandbox="allow-scripts"`.
-- The iframe receives a minimal React runtime. Communication via postMessage.
-- An Error Boundary wraps the visualization — broken code never crashes the app.
+- AI-generated visualization is a **complete, self-contained HTML document** stored in `concept_cards.html`.
+- The card runs inside an iframe with `sandbox="allow-scripts"` and is delivered via `srcdoc` so the iframe is a unique opaque origin (no `allow-same-origin`, no parent DOM access, no cookies).
+- Inline `<script>` and `<style>` are allowed; **external resources are blocked** by the static validator (no `src=http*`, `href=http*`, `import "http*"`, `fetch(`, `XMLHttpRequest`, `WebSocket`, etc.).
+- The iframe communicates with the host via `postMessage` only (`{type: 'ready' | 'interaction' | 'error', ...}`). The host wraps the iframe in an Error Boundary so a broken card never crashes the app.
+
+### Cards are Versioned and Community-Owned
+- A concept can have multiple cards (different versions, different authors). `concepts.best_card_id` points to the canonical one shown by default.
+- `concept_cards.status` flow: `draft` → (validate) → `published` | `flagged`.
+- Quality signals: `validation_renders`, `validation_has_interactivity`, `validation_screenshot_hash`, plus community signals `upvotes`, `views`, `embed_count`.
+- Provenance is tracked: `author_id`, `generated_with` (model id), `generation_prompt`, `parent_card_id` (for forks/iterations).
 
 ### Serendipity is Semantic, Not Random
 - Every concept description is embedded as a vector (pgvector).
@@ -50,122 +58,116 @@ This is NOT a learning management system. It is a personal/shared exploration to
 
 ## Project Structure
 
+This project does **not** use a `src/` directory — Next.js App Router files live at the repo root (`app/`, `components/`, etc.).
+
 ```
-src/
-├── app/                          # Next.js App Router
-│   ├── layout.tsx                # Root layout, providers
-│   ├── page.tsx                  # Main canvas page
-│   ├── globals.css               # Tailwind imports
-│   └── api/
-│       ├── mesh/route.ts         # GET: bulk fetch (concepts + connections + positions for viewport)
-│       ├── concepts/
-│       │   ├── route.ts          # GET (list/search), POST (create)
-│       │   └── [id]/
-│       │       ├── route.ts      # GET, PUT, DELETE single concept
-│       │       ├── generate/route.ts   # POST: trigger AI viz generation (SSE stream)
-│       │       └── expand/route.ts     # POST: generate sub-concepts for this concept
-│       ├── connections/route.ts  # GET, POST connections
-│       └── serendipity/route.ts  # GET: AI-surfaced unexpected connections
-│
-├── components/
-│   ├── canvas/
-│   │   ├── MeshCanvas.tsx        # React Flow canvas + d3-force integration
-│   │   ├── ConceptNode.tsx       # Custom node: concept card (adapts to zoom level)
-│   │   ├── ConnectionEdge.tsx    # Custom edge: color-coded connection line
-│   │   └── CanvasControls.tsx    # Zoom, fit, minimap
-│   ├── concept/
-│   │   ├── ConceptModal.tsx      # Focused modal for visualization
-│   │   └── ConceptSearch.tsx     # Search/create concepts
-│   ├── visualization/
-│   │   ├── VizRenderer.tsx       # iframe sandbox manager
-│   │   ├── VizPlaceholder.tsx    # Unexplored concept state
-│   │   └── VizError.tsx          # Error boundary
-│   └── serendipity/
-│       └── SerendipityBanner.tsx  # "Did you know X connects to Y?"
-│
-├── store/
-│   ├── meshStore.ts              # Nodes, edges, viewport, layout state
-│   ├── conceptStore.ts           # Concept data, generation status
-│   └── uiStore.ts                # Selection, modals, search
-│
-├── lib/
-│   ├── ai/
-│   │   ├── pipeline.ts           # Multi-shot generation pipeline
-│   │   ├── prompts.ts            # All prompt templates
-│   │   ├── serendipity.ts        # Serendipity engine
-│   │   └── techniqueMap.ts       # Concept → visualization technique mapping
-│   ├── db/
-│   │   ├── schema.ts             # Drizzle schema (4 tables + vectors)
-│   │   ├── client.ts             # Database client
-│   │   └── migrations/           # Drizzle migrations
-│   ├── graph/
-│   │   ├── layout.ts             # d3-force config and simulation
-│   │   ├── semanticZoom.ts       # Zoom-level detail logic
-│   │   └── clustering.ts         # Domain-based clustering
-│   └── eval/
-│       └── safeEval.ts           # Sandbox evaluation utilities
-│
-├── workers/
-│   └── forceLayout.worker.ts     # Web Worker for d3-force computation
-│
-└── types/
-    ├── concept.ts                # Concept, Connection, Visualization
-    └── mesh.ts                   # Node, Edge, Viewport
+app/                              # Next.js App Router
+├── layout.tsx                    # Root layout, providers
+├── page.tsx                      # Main canvas page
+├── globals.css                   # Tailwind imports
+├── auth/                         # NextAuth UI pages
+├── settings/                     # User settings (BYOK key entry)
+└── api/
+    ├── auth/[...nextauth]/route.ts   # NextAuth handler
+    ├── user/
+    │   ├── api-key/route.ts          # BYOK key (encrypted at rest)
+    │   └── favorites/route.ts        # Authenticated favorites
+    ├── mesh/route.ts                 # GET: viewport-bounded bulk fetch
+    ├── concepts/
+    │   ├── route.ts                  # GET (list/search), POST (create)
+    │   └── [id]/                     # path param is the concept slug
+    │       ├── route.ts              # GET, PUT, DELETE
+    │       ├── cards/route.ts        # GET cards for this concept
+    │       └── generate/route.ts     # POST: card generation — SSE stream
+    └── connections/route.ts          # GET, POST edges
+
+components/
+├── auth/UserMenu.tsx
+├── providers/SessionProvider.tsx
+├── canvas/{MeshCanvas,ConceptNode,ConnectionEdge}.tsx
+├── concept/ConceptModal.tsx          # Focused modal — wraps VizRenderer
+├── visualization/                    # iframe sandbox UI
+│   ├── VizRenderer.tsx               # srcdoc iframe with postMessage bridge
+│   ├── VizPlaceholder.tsx            # Unexplored / generating states
+│   └── VizError.tsx                  # Error boundary + retry
+└── serendipity/SerendipityBanner.tsx
+
+store/
+├── meshStore.ts                  # Nodes, edges, layout state
+└── uiStore.ts                    # Selection, modal, search, banners
+
+lib/
+├── auth.ts                       # NextAuth config + session helpers
+├── crypto.ts                     # AES-GCM encryption for BYOK keys
+├── ai/
+│   ├── client.ts                 # Anthropic client factory (BYOK-aware)
+│   ├── prompts.ts                # Plan / Generate / Fix prompt templates
+│   ├── techniqueMap.ts           # Concept → visualization technique
+│   ├── cardValidator.ts          # Static safety + structure checks
+│   └── pipeline.ts               # Multi-shot generator (yields PipelineEvent)
+├── db/{schema,client,seed}.ts
+├── db/migrations/
+└── graph/layout.ts               # d3-force layout
+
+types/
+├── concept.ts                    # Concept, ConceptCard, ConceptEdge, MeshData
+└── mesh.ts                       # Node, Edge types for React Flow
 ```
 
 ## Database Schema
 
-Four core tables + vector embeddings:
+The schema lives in `lib/db/schema.ts`. There are NextAuth tables (`users`, `accounts`, `sessions`, `verification_tokens`) plus the domain tables below. Treat `lib/db/schema.ts` as the source of truth — this section is a summary.
 
 ### concepts
-- `id` (text, PK, slug like "binary-search")
-- `name` (text, not null)
-- `domain` (text, not null)
-- `explanation` (text, not null)
-- `difficulty` (text, nullable: beginner/intermediate/advanced)
-- `metadata` (jsonb, extensible)
-- `embedding` (vector(1536), for semantic search)
-- `created_at`, `updated_at` (timestamps)
+- `slug` (text, **PK**, slug like `binary-search`)
+- `title`, `domain`, `description` (text, not null)
+- `embedding` (vector(1536), for semantic search / serendipity)
+- `best_card_id` (uuid, FK → concept_cards.id, nullable — canonical card)
+- `card_count` (integer, denormalized counter)
+- `created_at`, `updated_at`
 
-### connections
-- `id` (uuid, PK)
-- `source_id` (FK → concepts)
-- `target_id` (FK → concepts)
-- `type` (text, default "related" — extensible later)
-- `strength` (float, default 1.0 — for layout weighting)
-- `ai_generated` (boolean)
-- `reason` (text, nullable — "why this connection exists")
-- `created_at` (timestamp)
-- Unique constraint on (source_id, target_id)
+### concept_cards
+- `id` (uuid, PK), `slug` (FK → concepts.slug, cascade), `version` (integer)
+- Denormalized concept metadata: `title`, `domain`, `description`, `tags`, `difficulty`
+- **Visualization**: `html` (text, not null — self-contained HTML document), `thumbnail`, `interactivity_level`
+- **Quality**: `status` (`draft`/`validating`/`published`/`flagged`), `validation_renders`, `validation_has_interactivity`, `validation_screenshot_hash`
+- **Provenance**: `author_id` (FK → users), `generated_with` (model id), `generation_prompt`, `parent_card_id` (self-FK for forks)
+- **Community**: `upvotes`, `views`, `embed_count`
+- Unique on `(slug, version)`; indexes on `slug` and `status`
 
-### visualizations
-- `id` (uuid, PK)
-- `concept_id` (FK → concepts, not null)
-- `code` (text, not null — the React.createElement arrow function)
-- `plan` (text, nullable — AI planning output)
-- `version` (integer, default 1)
-- `is_active` (boolean, default true)
-- `created_at` (timestamp)
+### concept_edges
+- `id` (uuid, PK), `source_slug` and `target_slug` (FK → concepts.slug, cascade)
+- `relationship` (`related` | `prerequisite` | `application` | `contrast` | `analogy`, default `related`)
+- `reason` (text, nullable), `ai_generated` (bool), `created_at`
+- Unique on `(source_slug, target_slug)`
 
 ### node_positions
-- `concept_id` (FK → concepts, PK)
-- `x`, `y` (float)
-- `updated_at` (timestamp)
+- `concept_slug` (PK, FK → concepts.slug, cascade), `x`, `y`, `updated_at`
+
+### favorites
+- `(user_id, concept_slug)` composite PK with cascading FKs
 
 ## API Design
 
+Routes use the concept `slug` as the path parameter (kept as `[id]` in the file path for backwards compatibility).
+
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
-| GET | `/api/mesh?x=&y=&zoom=&radius=` | Viewport-based bulk fetch |
+| GET | `/api/mesh?x=&y=&radius=` | Viewport-bounded bulk fetch (concepts + edges + positions) |
 | GET | `/api/concepts?q=&domain=` | Search/list concepts |
 | POST | `/api/concepts` | Create concept |
-| GET | `/api/concepts/[id]` | Get concept + active visualization |
-| PUT | `/api/concepts/[id]` | Update concept |
-| POST | `/api/concepts/[id]/generate` | Trigger AI viz generation (SSE) |
-| POST | `/api/concepts/[id]/expand` | Generate sub-concepts (SSE) |
-| GET | `/api/connections` | List connections |
-| POST | `/api/connections` | Create connection |
-| GET | `/api/serendipity` | Get unexpected connection suggestion |
+| GET | `/api/concepts/[slug]` | Get concept |
+| PUT | `/api/concepts/[slug]` | Update concept |
+| DELETE | `/api/concepts/[slug]` | Delete concept |
+| GET | `/api/concepts/[slug]/cards` | List cards for a concept (or `?best=1` for the active one) |
+| POST | `/api/concepts/[slug]/generate` | Trigger AI card generation — **SSE stream** |
+| POST | `/api/concepts/[slug]/expand` | Generate sub-concepts — **SSE stream** *(planned)* |
+| GET | `/api/connections` | List edges |
+| POST | `/api/connections` | Create edge |
+| GET | `/api/serendipity` | Get an unexpected connection suggestion *(planned)* |
+| `*` | `/api/auth/[...nextauth]` | NextAuth.js session/sign-in/callback |
+| `*` | `/api/user/api-key` | BYOK key management (stored encrypted at rest) |
+| `*` | `/api/user/favorites` | Authenticated favorites |
 
 ## Coding Standards
 
@@ -182,10 +184,13 @@ Four core tables + vector embeddings:
 - Zustand actions are defined inside the store, not in components.
 
 ### AI Pipeline
-- All prompts live in `src/lib/ai/prompts.ts` as template functions.
-- Never hardcode model names — use environment variables.
-- Always stream generation progress to the client.
-- Generated code MUST be validated before saving to DB.
+- All prompts live in `lib/ai/prompts.ts` as template functions; the orchestrator lives in `lib/ai/pipeline.ts`.
+- Never hardcode model names. The model id comes from `process.env.ANTHROPIC_MODEL` with a sensible default (currently the latest Sonnet); the AI client is built via `lib/ai/client.ts` which resolves the user's BYOK key first.
+- Use **prompt caching** (`cache_control: { type: 'ephemeral' }`) for the system prompt so repeated generations are cheap.
+- Use **streaming** for the generate phase — the SSE route forwards phase updates and token deltas to the browser via `text/event-stream`.
+- Generated HTML MUST pass static validation (`lib/ai/cardValidator.ts`) before saving. If validation fails, the pipeline gets exactly **one** retry with the validator's error messages appended to the prompt.
+- Cards are written with `status: 'draft'`. They flip to `published` only after either client-side render confirmation (postMessage `ready`) or future Playwright validation.
+- The pipeline returns a typed `PipelineEvent` async iterable so the SSE route handler stays a thin adapter (the same generator can be tested or invoked from a worker without HTTP).
 
 ### Database
 - All DB access goes through Drizzle ORM. No raw SQL in route handlers.
@@ -210,12 +215,21 @@ Four core tables + vector embeddings:
 
 ## Environment Variables
 
-```env
-ANTHROPIC_API_KEY=           # Server-side only
-DATABASE_URL=                # PostgreSQL connection string (Neon)
-EMBEDDING_MODEL=             # Model for concept embeddings (default: voyage or similar)
-NEXT_PUBLIC_APP_URL=         # Public URL for the app
-```
+The canonical, fully documented list lives in `.env.local.example`. The variables ConceptMesh actually reads:
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `DATABASE_URL` | yes | Postgres connection string (pgvector required) |
+| `AUTH_SECRET` | yes | NextAuth session secret (`openssl rand -base64 32`) |
+| `ENCRYPTION_KEY` | yes | 32-byte hex key (`openssl rand -hex 32`) used to encrypt BYOK keys at rest |
+| `AUTH_GITHUB_ID` / `AUTH_GITHUB_SECRET` | optional | GitHub OAuth |
+| `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | optional | Google OAuth |
+| `ANTHROPIC_API_KEY` | optional | Server-side fallback when no user key is set |
+| `ANTHROPIC_MODEL` | optional | Model id (defaults to the latest Sonnet) |
+| `DEFAULT_PROVIDER` / `DEFAULT_API_KEY` | optional | Operator-level default provider/key |
+| `NEXT_PUBLIC_APP_URL` | yes (in prod) | Public base URL of the app |
+
+The Anthropic API key **never** reaches the client — all AI calls go through Route Handlers that resolve a key via `lib/ai/client.ts` (user BYOK first, then `ANTHROPIC_API_KEY`, then `DEFAULT_*`).
 
 ## Build Order
 
@@ -299,8 +313,9 @@ Custom slash commands for quality gates. Run these before merging any PR or afte
 ## Testing Strategy
 
 ### Unit Tests (Vitest — when added)
-- `lib/ai/pipeline.ts` — mock Anthropic SDK, test plan/generate/validate flow
+- `lib/ai/pipeline.ts` — mock Anthropic SDK, test plan/generate/validate/fix flow
 - `lib/ai/techniqueMap.ts` — concept-to-technique mapping
+- `lib/ai/cardValidator.ts` — must reject every dangerous pattern in the deny-list and accept clean inline-only HTML
 - `lib/graph/layout.ts` — d3-force config produces valid positions
 - `lib/db/schema.ts` — Drizzle schema matches expected shape
 - Store actions — Zustand store state transitions
