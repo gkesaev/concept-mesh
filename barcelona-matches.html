@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ברצלונה – משחקים אחרונים</title>
+  <style>
+    :root {
+      --barca-blue: #004D98;
+      --barca-red: #A50044;
+      --barca-gold: #EDBB00;
+      --bg-deep: #060d1f;
+      --bg-card: rgba(10, 20, 45, 0.85);
+      --bg-card-hover: rgba(15, 28, 60, 0.95);
+      --text-primary: #f0f4ff;
+      --text-secondary: #8fa3cc;
+      --win-color: #22c55e;
+      --draw-color: #facc15;
+      --loss-color: #ef4444;
+      --ucl-color: #6366f1;
+      --laliga-color: #f97316;
+      --copa-color: #a855f7;
+      --border-glow: rgba(0, 77, 152, 0.4);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated starfield background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 20%, rgba(0, 77, 152, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(165, 0, 68, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(6, 13, 31, 1) 0%, transparent 100%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ─── HEADER ─── */
+    header {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      padding: 48px 20px 36px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.6) 0%, transparent 100%);
+    }
+
+    .crest {
+      font-size: 72px;
+      line-height: 1;
+      filter: drop-shadow(0 0 24px rgba(237, 187, 0, 0.6));
+      animation: float 4s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+
+    header h1 {
+      font-size: clamp(1.8rem, 5vw, 3rem);
+      font-weight: 900;
+      letter-spacing: -0.02em;
+      margin-top: 12px;
+      background: linear-gradient(135deg, #004D98 0%, #A50044 50%, #EDBB00 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+    }
+
+    header p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-top: 6px;
+    }
+
+    /* ─── STATS BAR ─── */
+    .stats-bar {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      padding: 0 20px 32px;
+    }
+
+    .stat-chip {
+      background: var(--bg-card);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 50px;
+      padding: 8px 20px;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: blur(12px);
+    }
+
+    .stat-chip .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* ─── GRID ─── */
+    .matches-grid {
+      position: relative;
+      z-index: 10;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 20px 60px;
+    }
+
+    /* ─── MATCH CARD ─── */
+    .match-card {
+      background: var(--bg-card);
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.07);
+      backdrop-filter: blur(16px);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+      position: relative;
+    }
+
+    .match-card:hover {
+      transform: translateY(-4px);
+      background: var(--bg-card-hover);
+    }
+
+    .match-card.win {
+      border-top: 3px solid var(--win-color);
+      box-shadow: 0 0 30px rgba(34, 197, 94, 0.08);
+    }
+    .match-card.win:hover {
+      box-shadow: 0 8px 40px rgba(34, 197, 94, 0.18);
+    }
+
+    .match-card.draw {
+      border-top: 3px solid var(--draw-color);
+      box-shadow: 0 0 30px rgba(250, 204, 21, 0.08);
+    }
+    .match-card.draw:hover {
+      box-shadow: 0 8px 40px rgba(250, 204, 21, 0.18);
+    }
+
+    .match-card.loss {
+      border-top: 3px solid var(--loss-color);
+      box-shadow: 0 0 30px rgba(239, 68, 68, 0.08);
+    }
+    .match-card.loss:hover {
+      box-shadow: 0 8px 40px rgba(239, 68, 68, 0.18);
+    }
+
+    /* Card top bar */
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .competition-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: 20px;
+    }
+
+    .badge-laliga {
+      background: rgba(249, 115, 22, 0.18);
+      color: #fb923c;
+      border: 1px solid rgba(249, 115, 22, 0.35);
+    }
+
+    .badge-ucl {
+      background: rgba(99, 102, 241, 0.18);
+      color: #818cf8;
+      border: 1px solid rgba(99, 102, 241, 0.35);
+    }
+
+    .badge-copa {
+      background: rgba(168, 85, 247, 0.18);
+      color: #c084fc;
+      border: 1px solid rgba(168, 85, 247, 0.35);
+    }
+
+    .match-date {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+
+    /* Score section */
+    .score-section {
+      padding: 20px 18px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .team-side {
+      flex: 1;
+      text-align: center;
+    }
+
+    .team-name {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+
+    .team-name.barca {
+      color: var(--text-primary);
+      font-weight: 700;
+    }
+
+    .score-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      direction: ltr;
+    }
+
+    .score-number {
+      font-size: 3rem;
+      font-weight: 900;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .score-number.barca-score {
+      color: var(--text-primary);
+    }
+
+    .score-number.opp-score {
+      color: var(--text-secondary);
+    }
+
+    .score-divider {
+      font-size: 2rem;
+      color: rgba(255,255,255,0.2);
+      font-weight: 300;
+    }
+
+    .result-badge {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 900;
+      letter-spacing: 0.03em;
+      flex-shrink: 0;
+    }
+
+    .result-badge.win { background: rgba(34, 197, 94, 0.2); color: var(--win-color); border: 1.5px solid var(--win-color); }
+    .result-badge.draw { background: rgba(250, 204, 21, 0.2); color: var(--draw-color); border: 1.5px solid var(--draw-color); }
+    .result-badge.loss { background: rgba(239, 68, 68, 0.2); color: var(--loss-color); border: 1.5px solid var(--loss-color); }
+
+    .ha-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      margin-top: 4px;
+      display: inline-block;
+    }
+
+    .ha-home {
+      background: rgba(0, 77, 152, 0.3);
+      color: #60a5fa;
+      border: 1px solid rgba(0, 77, 152, 0.5);
+    }
+
+    .ha-away {
+      background: rgba(165, 0, 68, 0.3);
+      color: #f9a8d4;
+      border: 1px solid rgba(165, 0, 68, 0.5);
+    }
+
+    /* Location */
+    .location-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 18px 12px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .location-icon {
+      font-size: 1rem;
+      flex-shrink: 0;
+    }
+
+    .stadium-name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    /* Aggregate note */
+    .aggregate-note {
+      font-size: 0.72rem;
+      padding: 4px 18px 8px;
+      color: var(--barca-gold);
+      font-weight: 600;
+    }
+
+    /* Goals section */
+    .goals-section {
+      padding: 12px 18px 18px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    .goals-title {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+      font-weight: 600;
+    }
+
+    .goal-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .goal-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      direction: ltr;
+    }
+
+    .goal-minute {
+      background: rgba(255,255,255,0.07);
+      border-radius: 6px;
+      padding: 2px 7px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--barca-gold);
+      min-width: 38px;
+      text-align: center;
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .goal-icon {
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .goal-player {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .goal-player.opponent {
+      color: var(--text-secondary);
+    }
+
+    .goal-note {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    .goal-team-tag {
+      font-size: 0.65rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .tag-barca {
+      background: rgba(0, 77, 152, 0.4);
+      color: #93c5fd;
+      border: 1px solid rgba(0, 77, 152, 0.5);
+    }
+
+    .tag-opp {
+      background: rgba(100, 100, 120, 0.3);
+      color: #9ca3af;
+      border: 1px solid rgba(100, 100, 120, 0.3);
+    }
+
+    /* Footer */
+    footer {
+      position: relative;
+      z-index: 10;
+      text-align: center;
+      padding: 24px 20px 40px;
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      border-top: 1px solid rgba(255,255,255,0.05);
+    }
+
+    footer a {
+      color: #60a5fa;
+      text-decoration: none;
+    }
+
+    /* Filter bar */
+    .filter-bar {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 0 20px 28px;
+    }
+
+    .filter-btn {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text-secondary);
+      border-radius: 50px;
+      padding: 8px 18px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+      background: rgba(0, 77, 152, 0.3);
+      border-color: var(--barca-blue);
+      color: #93c5fd;
+    }
+
+    /* Animation */
+    .match-card {
+      animation: fadeUp 0.5s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .match-card:nth-child(1) { animation-delay: 0.05s; }
+    .match-card:nth-child(2) { animation-delay: 0.10s; }
+    .match-card:nth-child(3) { animation-delay: 0.15s; }
+    .match-card:nth-child(4) { animation-delay: 0.20s; }
+    .match-card:nth-child(5) { animation-delay: 0.25s; }
+    .match-card:nth-child(6) { animation-delay: 0.30s; }
+    .match-card:nth-child(7) { animation-delay: 0.35s; }
+    .match-card:nth-child(8) { animation-delay: 0.40s; }
+    .match-card:nth-child(9) { animation-delay: 0.45s; }
+    .match-card:nth-child(10) { animation-delay: 0.50s; }
+    .match-card:nth-child(11) { animation-delay: 0.55s; }
+    .match-card:nth-child(12) { animation-delay: 0.60s; }
+
+    @media (max-width: 480px) {
+      .matches-grid { grid-template-columns: 1fr; }
+      .score-number { font-size: 2.4rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ─── HEADER ─── -->
+  <header>
+    <div class="crest">🔵🔴</div>
+    <h1>FC Barcelona — משחקים אחרונים</h1>
+    <p>מרץ–מאי 2026 | La Liga &amp; Champions League</p>
+  </header>
+
+  <!-- ─── STATS BAR ─── -->
+  <div class="stats-bar" id="statsBar"></div>
+
+  <!-- ─── FILTER BAR ─── -->
+  <div class="filter-bar" id="filterBar"></div>
+
+  <!-- ─── MATCHES GRID ─── -->
+  <div class="matches-grid" id="matchesGrid"></div>
+
+  <!-- ─── FOOTER ─── -->
+  <footer>
+    <p>נתונים לפי: ESPN, UEFA, NBC Sports, beIN Sports, Al Jazeera &amp; Washington Post &nbsp;|&nbsp; עודכן: 8 במאי 2026</p>
+  </footer>
+
+  <script>
+    const matches = [
+      {
+        date: "7 מרץ 2026",
+        dateSort: "2026-03-07",
+        competition: "La Liga",
+        matchday: "מחזור 27",
+        homeAway: "חוץ",
+        opponent: "Athletic Club",
+        barcelonaGoals: 1,
+        opponentGoals: 0,
+        stadium: "Estadio San Mamés",
+        city: "בילבאו",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "barca", player: "Lamine Yamal", minute: "68" }
+        ]
+      },
+      {
+        date: "10 מרץ 2026",
+        dateSort: "2026-03-10",
+        competition: "UCL",
+        matchday: "שמינית גמר – רגל 1",
+        homeAway: "חוץ",
+        opponent: "Newcastle United",
+        barcelonaGoals: 1,
+        opponentGoals: 1,
+        stadium: "St. James' Park",
+        city: "ניוקאסל",
+        country: "אנגליה",
+        flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿",
+        goalscorers: [
+          { team: "barca",    player: "Lamine Yamal",  minute: "90+6", note: "פנדל" },
+          { team: "opponent", player: "Harvey Barnes",  minute: "86" }
+        ]
+      },
+      {
+        date: "15 מרץ 2026",
+        dateSort: "2026-03-15",
+        competition: "La Liga",
+        matchday: "מחזור 28",
+        homeAway: "בית",
+        opponent: "Sevilla",
+        barcelonaGoals: 5,
+        opponentGoals: 2,
+        stadium: "Spotify Camp Nou",
+        city: "ברצלונה",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "barca",    player: "Raphinha",    minute: "9",    note: "פנדל" },
+          { team: "barca",    player: "Dani Olmo",   minute: "38" },
+          { team: "barca",    player: "Raphinha",    minute: "21",   note: "פנדל" },
+          { team: "opponent", player: "Oso",         minute: "45+3" },
+          { team: "barca",    player: "Raphinha",    minute: "51" },
+          { team: "barca",    player: "João Cancelo",minute: "60" },
+          { team: "opponent", player: "Djibril Sow", minute: "90+2" }
+        ]
+      },
+      {
+        date: "18 מרץ 2026",
+        dateSort: "2026-03-18",
+        competition: "UCL",
+        matchday: "שמינית גמר – רגל 2",
+        homeAway: "בית",
+        opponent: "Newcastle United",
+        barcelonaGoals: 7,
+        opponentGoals: 2,
+        aggregate: "8-3 לטובת ברצלונה",
+        stadium: "Spotify Camp Nou",
+        city: "ברצלונה",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "barca",    player: "Raphinha",          minute: "6" },
+          { team: "opponent", player: "Anthony Elanga",     minute: "15" },
+          { team: "barca",    player: "Marc Bernal",        minute: "18" },
+          { team: "opponent", player: "Anthony Elanga",     minute: "28" },
+          { team: "barca",    player: "Lamine Yamal",       minute: "45+7", note: "פנדל" },
+          { team: "barca",    player: "Fermín López",       minute: "52" },
+          { team: "barca",    player: "R. Lewandowski",     minute: "56" },
+          { team: "barca",    player: "R. Lewandowski",     minute: "61" },
+          { team: "barca",    player: "Raphinha",           minute: "72" }
+        ]
+      },
+      {
+        date: "22 מרץ 2026",
+        dateSort: "2026-03-22",
+        competition: "La Liga",
+        matchday: "מחזור 29",
+        homeAway: "בית",
+        opponent: "Rayo Vallecano",
+        barcelonaGoals: 1,
+        opponentGoals: 0,
+        stadium: "Spotify Camp Nou",
+        city: "ברצלונה",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "barca", player: "Ronald Araújo", minute: "24", note: "כותרת מקורנר" }
+        ]
+      },
+      {
+        date: "4 אפריל 2026",
+        dateSort: "2026-04-04",
+        competition: "La Liga",
+        matchday: "מחזור 30",
+        homeAway: "חוץ",
+        opponent: "Atlético Madrid",
+        barcelonaGoals: 2,
+        opponentGoals: 1,
+        stadium: "Civitas Metropolitano",
+        city: "מדריד",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "opponent", player: "Giuliano Simeone", minute: "39" },
+          { team: "barca",    player: "Marcus Rashford",  minute: "42" },
+          { team: "barca",    player: "R. Lewandowski",   minute: "87" }
+        ]
+      },
+      {
+        date: "8 אפריל 2026",
+        dateSort: "2026-04-08",
+        competition: "UCL",
+        matchday: "רבע גמר – רגל 1",
+        homeAway: "בית",
+        opponent: "Atlético Madrid",
+        barcelonaGoals: 0,
+        opponentGoals: 2,
+        stadium: "Spotify Camp Nou",
+        city: "ברצלונה",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "opponent", player: "Julián Álvarez",    minute: "45", note: "בעיטה חופשית; כובארסי גורש" },
+          { team: "opponent", player: "Alexander Sørloth", minute: "70" }
+        ]
+      },
+      {
+        date: "11 אפריל 2026",
+        dateSort: "2026-04-11",
+        competition: "La Liga",
+        matchday: "מחזור 31",
+        homeAway: "בית",
+        opponent: "Espanyol",
+        barcelonaGoals: 4,
+        opponentGoals: 1,
+        stadium: "Spotify Camp Nou",
+        city: "ברצלונה",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "barca",    player: "Ferran Torres",  minute: "9" },
+          { team: "barca",    player: "Ferran Torres",  minute: "25" },
+          { team: "opponent", player: "Pol Lozano",     minute: "56" },
+          { team: "barca",    player: "Lamine Yamal",   minute: "87" },
+          { team: "barca",    player: "Marcus Rashford",minute: "89" }
+        ]
+      },
+      {
+        date: "14 אפריל 2026",
+        dateSort: "2026-04-14",
+        competition: "UCL",
+        matchday: "רבע גמר – רגל 2",
+        homeAway: "חוץ",
+        opponent: "Atlético Madrid",
+        barcelonaGoals: 2,
+        opponentGoals: 1,
+        aggregate: "3-2 לטובת אטלטיקו – ברצלונה נפלה",
+        stadium: "Civitas Metropolitano",
+        city: "מדריד",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "barca",    player: "Lamine Yamal",    minute: "4" },
+          { team: "barca",    player: "Ferran Torres",   minute: "24" },
+          { team: "opponent", player: "Ademola Lookman", minute: "31", note: "אריק גרסיה גורש ב-79'" }
+        ]
+      },
+      {
+        date: "22 אפריל 2026",
+        dateSort: "2026-04-22",
+        competition: "La Liga",
+        matchday: "מחזור 33",
+        homeAway: "בית",
+        opponent: "Celta Vigo",
+        barcelonaGoals: 1,
+        opponentGoals: 0,
+        stadium: "Spotify Camp Nou",
+        city: "ברצלונה",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "barca", player: "Lamine Yamal", minute: "40", note: "פנדל; ימאל נפצע לאחר הגביה" }
+        ]
+      },
+      {
+        date: "25 אפריל 2026",
+        dateSort: "2026-04-25",
+        competition: "La Liga",
+        matchday: "מחזור 32",
+        homeAway: "חוץ",
+        opponent: "Getafe",
+        barcelonaGoals: 2,
+        opponentGoals: 0,
+        stadium: "Coliseum Alfonso Pérez",
+        city: "חטאפה",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "barca", player: "Fermín López",   minute: "45" },
+          { team: "barca", player: "Marcus Rashford", minute: "74" }
+        ]
+      },
+      {
+        date: "2 מאי 2026",
+        dateSort: "2026-05-02",
+        competition: "La Liga",
+        matchday: "מחזור 34",
+        homeAway: "חוץ",
+        opponent: "Osasuna",
+        barcelonaGoals: 2,
+        opponentGoals: 1,
+        stadium: "Estadio El Sadar",
+        city: "פמפלונה",
+        country: "ספרד",
+        flag: "🇪🇸",
+        goalscorers: [
+          { team: "barca",    player: "R. Lewandowski",minute: "81" },
+          { team: "barca",    player: "Ferran Torres", minute: "86" },
+          { team: "opponent", player: "Raúl García",   minute: "88" }
+        ]
+      }
+    ];
+
+    function getResult(m) {
+      if (m.barcelonaGoals > m.opponentGoals) return "win";
+      if (m.barcelonaGoals === m.opponentGoals) return "draw";
+      return "loss";
+    }
+
+    function resultLabel(r) {
+      return r === "win" ? "נ" : r === "draw" ? "ת" : "ה";
+    }
+
+    function competitionBadgeClass(comp) {
+      if (comp === "UCL") return "badge-ucl";
+      if (comp === "La Liga") return "badge-laliga";
+      return "badge-copa";
+    }
+
+    function competitionLabel(comp) {
+      if (comp === "UCL") return "⭐ Champions League";
+      if (comp === "La Liga") return "🏆 La Liga";
+      return comp;
+    }
+
+    function buildCard(m) {
+      const result = getResult(m);
+      const homeAwayCls = m.homeAway === "בית" ? "ha-home" : "ha-away";
+
+      // Sort goalscorers by minute numerically
+      const sorted = [...m.goalscorers].sort((a, b) => {
+        const minA = parseInt(a.minute);
+        const minB = parseInt(b.minute);
+        return minA - minB;
+      });
+
+      const goalsHtml = sorted.map(g => {
+        const isBarca = g.team === "barca";
+        const tagClass = isBarca ? "tag-barca" : "tag-opp";
+        const tagLabel = isBarca ? "FCB" : m.opponent.split(" ")[0].substring(0, 5).toUpperCase();
+        const playerClass = isBarca ? "goal-player" : "goal-player opponent";
+        const icon = isBarca ? "⚽" : "⚽";
+        const noteHtml = g.note ? `<span class="goal-note">(${g.note})</span>` : "";
+        return `
+          <div class="goal-item">
+            <span class="goal-minute">${g.minute}'</span>
+            <span class="goal-icon">${icon}</span>
+            <span class="${playerClass}">${g.player}</span>
+            ${noteHtml}
+            <span class="goal-team-tag ${tagClass}">${tagLabel}</span>
+          </div>`;
+      }).join("");
+
+      const aggregateHtml = m.aggregate
+        ? `<div class="aggregate-note">🔗 מצטבר: ${m.aggregate}</div>`
+        : "";
+
+      // Build score display (always show home team first on left)
+      const isHome = m.homeAway === "בית";
+      const leftName = isHome ? "FC Barcelona" : m.opponent;
+      const rightName = isHome ? m.opponent : "FC Barcelona";
+      const leftScore = isHome ? m.barcelonaGoals : m.opponentGoals;
+      const rightScore = isHome ? m.opponentGoals : m.barcelonaGoals;
+      const leftClass = isHome ? "barca-score" : "opp-score";
+      const rightClass = isHome ? "opp-score" : "barca-score";
+      const leftNameClass = isHome ? "barca" : "";
+      const rightNameClass = isHome ? "" : "barca";
+
+      return `
+        <div class="match-card ${result}" data-comp="${m.competition}">
+          <div class="card-header">
+            <span class="competition-badge ${competitionBadgeClass(m.competition)}">${competitionLabel(m.competition)}</span>
+            <span class="match-date">📅 ${m.date}</span>
+          </div>
+
+          <div class="score-section">
+            <div class="team-side">
+              <div class="team-name ${leftNameClass}">${leftName}</div>
+              <span class="ha-badge ${isHome ? 'ha-home' : 'ha-away'}">${isHome ? "בית 🏠" : "חוץ ✈️"}</span>
+            </div>
+            <div class="score-box">
+              <span class="score-number ${leftClass}">${leftScore}</span>
+              <span class="score-divider">–</span>
+              <span class="score-number ${rightClass}">${rightScore}</span>
+            </div>
+            <div class="team-side">
+              <div class="team-name ${rightNameClass}">${rightName}</div>
+              <div class="result-badge ${result}">${resultLabel(result)}</div>
+            </div>
+          </div>
+
+          <div class="location-bar">
+            <span class="location-icon">📍</span>
+            <div>
+              <span class="stadium-name">${m.stadium}</span>
+              &nbsp;·&nbsp;${m.city}, ${m.country} ${m.flag}
+            </div>
+          </div>
+
+          ${aggregateHtml}
+
+          <div class="goals-section">
+            <div class="goals-title">⚽ כובשים</div>
+            <div class="goal-list">${goalsHtml}</div>
+          </div>
+        </div>`;
+    }
+
+    function computeStats(list) {
+      let wins = 0, draws = 0, losses = 0, gf = 0, ga = 0;
+      list.forEach(m => {
+        const r = getResult(m);
+        if (r === "win") wins++;
+        else if (r === "draw") draws++;
+        else losses++;
+        gf += m.barcelonaGoals;
+        ga += m.opponentGoals;
+      });
+      return { wins, draws, losses, gf, ga };
+    }
+
+    function render(filter) {
+      const filtered = filter === "all"
+        ? matches
+        : matches.filter(m => m.competition === filter);
+
+      document.getElementById("matchesGrid").innerHTML = filtered.map(buildCard).join("");
+
+      const s = computeStats(filtered);
+      document.getElementById("statsBar").innerHTML = `
+        <div class="stat-chip"><span class="dot" style="background:var(--win-color)"></span>ניצחונות: <strong>${s.wins}</strong></div>
+        <div class="stat-chip"><span class="dot" style="background:var(--draw-color)"></span>תיקו: <strong>${s.draws}</strong></div>
+        <div class="stat-chip"><span class="dot" style="background:var(--loss-color)"></span>הפסדים: <strong>${s.losses}</strong></div>
+        <div class="stat-chip">⚽ שערים: <strong>${s.gf}:${s.ga}</strong></div>
+        <div class="stat-chip">📊 משחקים: <strong>${filtered.length}</strong></div>
+      `;
+    }
+
+    // Build filter buttons
+    const competitions = ["all", "La Liga", "UCL"];
+    const compLabels = { all: "הכל", "La Liga": "🏆 La Liga", UCL: "⭐ Champions League" };
+    let activeFilter = "all";
+
+    const filterBar = document.getElementById("filterBar");
+    competitions.forEach(comp => {
+      const btn = document.createElement("button");
+      btn.className = "filter-btn" + (comp === "all" ? " active" : "");
+      btn.textContent = compLabels[comp];
+      btn.addEventListener("click", () => {
+        activeFilter = comp;
+        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        render(activeFilter);
+      });
+      filterBar.appendChild(btn);
+    });
+
+    render("all");
+  </script>
+</body>
+</html>
