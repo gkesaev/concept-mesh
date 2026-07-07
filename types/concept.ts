@@ -52,6 +52,10 @@ export interface ConceptEdge {
   createdAt: string
 }
 
+export interface ConceptDetail extends Concept {
+  bestCard: ConceptCard | null
+}
+
 export interface NodePosition {
   conceptSlug: string
   x: number
