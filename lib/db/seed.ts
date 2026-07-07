@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { count, eq } from 'drizzle-orm'
 import { db } from './client'
-import { concepts, conceptEdges } from './schema'
+import { concepts, conceptEdges, conceptCards } from './schema'
 
 const SEED_CONCEPTS = [
   {
@@ -75,6 +78,64 @@ const SEED_EDGES = [
   { sourceSlug: 'wave-particle-duality', targetSlug: 'probability',  reason: 'Quantum measurements yield probabilistic outcomes described by wave functions' },
 ]
 
+// Reference cards from the card spec (docs/card-spec.md, issue #8)
+const SEED_CARDS = [
+  {
+    slug: 'binary-search',
+    file: 'binary-search.html',
+    tags: ['algorithms', 'trees'],
+    difficulty: 'beginner' as const,
+    interactivityLevel: 0,
+  },
+  {
+    slug: 'compound-interest',
+    file: 'compound-interest.html',
+    tags: ['finance', 'exponential-growth'],
+    difficulty: 'beginner' as const,
+    interactivityLevel: 1,
+  },
+]
+
+async function seedCards() {
+  for (const sc of SEED_CARDS) {
+    const concept = SEED_CONCEPTS.find(c => c.slug === sc.slug)
+    if (!concept) continue
+
+    const html = readFileSync(join(__dirname, 'seed-cards', sc.file), 'utf-8')
+
+    await db.transaction(async (tx) => {
+      await tx.insert(conceptCards).values({
+        slug: sc.slug,
+        version: 1,
+        title: concept.title,
+        domain: concept.domain,
+        description: concept.description,
+        tags: sc.tags,
+        difficulty: sc.difficulty,
+        html,
+        interactivityLevel: sc.interactivityLevel,
+        status: 'published',
+        validationRenders: true,
+        generatedWith: 'seed',
+      }).onConflictDoNothing()
+
+      const card = await tx.query.conceptCards.findFirst({
+        where: (c, { and, eq }) => and(eq(c.slug, sc.slug), eq(c.version, 1)),
+      })
+      if (!card) return
+
+      const [{ value: cardCount }] = await tx
+        .select({ value: count() })
+        .from(conceptCards)
+        .where(eq(conceptCards.slug, sc.slug))
+
+      await tx.update(concepts)
+        .set({ bestCardId: card.id, cardCount, updatedAt: new Date() })
+        .where(eq(concepts.slug, sc.slug))
+    })
+  }
+}
+
 async function seed() {
   console.log('Seeding concepts...')
   await db.insert(concepts).values(SEED_CONCEPTS).onConflictDoNothing()
@@ -87,6 +148,9 @@ async function seed() {
       aiGenerated: false,
     }))
   ).onConflictDoNothing()
+
+  console.log('Seeding cards...')
+  await seedCards()
 
   console.log('Seed complete.')
 }
