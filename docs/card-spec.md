@@ -58,7 +58,7 @@ A card is a complete HTML document. It MUST:
 ## CSS
 
 - All styles MUST be **inline** via `<style>` blocks in `<head>` or `style="..."` attributes. No `<link rel="stylesheet">`.
-- No `@import`, no `url(...)` referencing external origins. `url("data:...")` is allowed.
+- No `@import`, no `url(...)` or `image-set(...)` referencing external origins. `url("data:...")` and fragment references (`url(#id)`) are allowed.
 - No `@font-face` with external URLs. Use system font stacks (`system-ui, -apple-system, Segoe UI, sans-serif`).
 
 ### Theme variables (CSS custom properties)
@@ -113,10 +113,14 @@ The following are **prohibited** anywhere in the card:
 - `<link>` to external stylesheets, fonts, icons, or preconnect hints.
 - `<script src>` pointing to any URL.
 - `<img src>`, `<video src>`, `<audio src>`, `<source src>`, `<iframe src>`, `<embed src>`, `<object data>` pointing to any URL.
-- `background-image: url(https://...)` or similar in CSS.
-- Any `fetch`/`XHR`/`WebSocket` call from JS.
+- `srcset` on `<img>`/`<source>` pointing to any URL.
+- SVG `href`/`xlink:href` (e.g. `<use>`, `<image>`) pointing to any URL.
+- `<video poster>` pointing to any URL.
+- `<meta http-equiv="refresh">` redirects.
+- `background-image: url(https://...)`, `image-set(...)`, or similar in CSS.
+- Any `fetch`/`XHR`/`WebSocket` call, or `location.href`/`location.replace`/`location.assign` redirect, from JS.
 
-**Allowed**: `data:` URIs (inline SVG, base64 images), and inline `<svg>` elements.
+**Allowed**: `data:` URIs (inline SVG, base64 images), fragment-only references (`href="#id"`, `url(#id)`), and inline `<svg>` elements.
 
 ## Size limits
 
