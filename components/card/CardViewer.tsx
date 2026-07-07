@@ -61,12 +61,17 @@ export function CardViewer({ card }: CardViewerProps) {
     return () => clearTimeout(t)
   }, [loading])
 
-  // Close fullscreen with Escape
+  // Close fullscreen with Escape. Capture phase + stopPropagation so the
+  // modal's own Escape handler doesn't also close the modal underneath.
   useEffect(() => {
     if (!fullscreen) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setFullscreen(false)
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      setFullscreen(false)
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
   }, [fullscreen])
 
   const copyEmbedCode = useCallback(async () => {
