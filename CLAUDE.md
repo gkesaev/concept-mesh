@@ -1,324 +1,259 @@
 # ConceptMesh — Agentic Instructions
 
+> **Source of truth.** This file describes the code **as it exists on `main` today (v2)**,
+> not the original prototype. Product vision lives in [`PROJECT.md`](PROJECT.md); the
+> human-facing setup guide is [`README.md`](README.md). Where a feature is planned but not
+> yet built, it is marked _(planned — see #NN)_ with its tracking issue. If you change the
+> architecture, update this file in the same PR.
+
 ## What This Is
 
-ConceptMesh is a visual concept exploration platform. It renders an infinite, zoomable mesh of concept cards connected by color-coded edges. Users explore knowledge spatially — zooming in fractures concepts into deeper sub-concepts, clicking a card opens a focused modal with an AI-generated interactive visualization. The graph is limitless: every concept is a door to more concepts, and a serendipity engine surfaces unexpected connections between distant ideas.
+ConceptMesh is a visual concept exploration platform: an infinite, zoomable mesh of concept
+cards connected by color-coded edges. Zooming in fractures a concept into deeper
+sub-concepts; clicking a card opens a focused modal rendering an **AI-generated, self-contained
+HTML visualization** inside a sandboxed iframe. A serendipity engine surfaces unexpected
+connections between semantically-close but graph-distant ideas.
 
-This is NOT a learning management system. It is a personal/shared exploration tool for finding exciting connections between ideas.
+It is **not** a learning-management system. It is a personal/shared exploration tool for
+finding exciting connections between ideas.
+
+### The v1 → v2 pivot (read this before trusting old prose)
+
+The prototype (see the archived vision in `PROJECT.md`) generated `React.createElement`
+strings for a single provider (Anthropic). **v2 replaced that model:**
+
+| v1 (prototype) | v2 (current) |
+|---|---|
+| `React.createElement` code strings | **Self-contained HTML cards** (inline CSS/JS, `--cm-*` theme vars) — see [`docs/card-spec.md`](docs/card-spec.md) _(planned — #8, PR #35)_ |
+| Anthropic-only, key in env | **Multi-provider adapters** (Anthropic / OpenAI / OpenAI-compatible), per-user encrypted keys _(planned — #11–#15)_ |
+| No auth | **NextAuth.js** (GitHub / Google OAuth) |
+| Single `visualizations` table | **`concept_cards`** with versions, status, votes, remixes |
+| Client-side in-memory cache | **PostgreSQL 16 + pgvector** via Drizzle |
+| Local render only | **Playwright** server-side card validation _(planned — #9)_ |
+
+If you find a doc that describes `React.createElement`, `src/` layout, a `voyage`
+embedding default, or an `EMBEDDING_MODEL` env var, it is stale v1 — trust the schema in
+`lib/db/schema.ts` and the code, not the prose.
 
 ## Tech Stack
 
 | Layer | Technology | License |
 |-------|-----------|---------|
-| Framework | Next.js 15 (App Router, TypeScript) | MIT |
+| Framework | Next.js 16 (App Router, TypeScript, Node 22) | MIT |
 | Graph Canvas | @xyflow/react (React Flow) | MIT |
-| Layout Physics | d3-force (Web Worker) | ISC |
+| Layout Physics | d3-force | ISC |
 | State Management | Zustand | MIT |
 | Styling | Tailwind CSS 4 | MIT |
-| Database | PostgreSQL + pgvector (Neon) | MIT-compatible |
-| ORM | Drizzle ORM | MIT |
-| AI | @anthropic-ai/sdk (server-side only) | MIT |
-| Viz Sandboxing | iframe sandbox with injected React runtime | N/A |
+| Database | PostgreSQL 16 + pgvector | PostgreSQL (permissive) |
+| ORM | Drizzle ORM | Apache-2.0 |
+| Auth | NextAuth.js (`next-auth@5`, Drizzle adapter) | ISC |
+| AI | `@anthropic-ai/sdk` today; provider adapters _(planned — #11)_ | MIT |
+| Card validation | Playwright (headless Chromium) _(planned — #9)_ | Apache-2.0 |
+| Viz sandboxing | iframe `sandbox="allow-scripts"` rendering self-contained HTML | N/A |
 
-**All dependencies MUST have MIT, ISC, Apache-2.0, or BSD licenses. No GPL. Check before adding.**
+**All dependencies MUST have MIT, ISC, Apache-2.0, or BSD (or the equally-permissive
+PostgreSQL) license. No GPL. Check before adding.**
 
 ## Architecture Principles
 
 ### The Graph is Limitless
 - The mesh expands as users explore. There is no "full graph" — only what has been discovered so far.
-- Viewport-based loading: fetch nodes near the camera, load more on pan/zoom.
+- Viewport-based loading: `GET /api/mesh?x=&y=&radius=` fetches concepts/edges/positions near the camera.
 - New nodes appear relative to their parent and settle via d3-force without reshuffling everything.
-- Every concept's prerequisites/applications are pointers to nodes that may not exist yet — they get created on first click.
 
 ### AI Pipeline is Server-Side
-- The Anthropic API key NEVER reaches the client.
-- All AI calls happen in Next.js Route Handlers.
-- Generation progress streams to the client via Server-Sent Events (SSE).
-- Multi-shot pipeline: Plan → Generate → Validate (local) → Fix (if needed) → Save to DB.
+- Provider API keys NEVER reach the client. User keys are encrypted at rest
+  (`ENCRYPTION_KEY`, AES via `lib/crypto.ts`) and only decrypted server-side.
+- All AI calls happen in Next.js Route Handlers. `lib/ai/client.ts` resolves a key in this
+  order: the signed-in user's encrypted key → `ANTHROPIC_API_KEY` → `DEFAULT_PROVIDER`/`DEFAULT_API_KEY`.
+- Generation streams progress to the client via SSE _(planned — #17)_.
+- Pipeline: Plan → Generate → Validate (Playwright) → Fix (one retry) → Save.
 
-### Generated Visualizations are Sandboxed
-- AI-generated visualization code is a string containing a React arrow function using React.createElement (NO JSX).
-- Code runs inside an iframe sandbox with `sandbox="allow-scripts"`.
-- The iframe receives a minimal React runtime. Communication via postMessage.
-- An Error Boundary wraps the visualization — broken code never crashes the app.
+### Cards are Self-Contained HTML, Sandboxed
+- A card is a string of self-contained HTML (inline CSS/JS, no external resources) themed
+  through `--cm-bg`, `--cm-text`, `--cm-accent`, `--cm-surface`, `--cm-border`.
+- Rendered by `components/card/CardViewer.tsx` inside an iframe with `sandbox="allow-scripts"`
+  (no `allow-same-origin`, no `allow-popups`). Communication via `postMessage`.
+- An error boundary wraps the viewer — broken card code never crashes the app.
+- The generation↔rendering contract is `docs/card-spec.md` _(planned — #8, PR #35)_.
 
 ### Serendipity is Semantic, Not Random
-- Every concept description is embedded as a vector (pgvector).
-- Serendipity = find concepts that are semantically close but graph-distant (near in vector space, far in hop count).
-- Claude then articulates WHY they connect.
-- Connections are stored with `ai_generated: true` and a `reason` field.
+- Every concept description is embedded as a `vector(1536)` (pgvector).
+- Serendipity = concepts with high cosine similarity (> 0.8) but graph distance > 3 hops.
+- Claude then articulates WHY they connect; stored as a `concept_edges` row with
+  `ai_generated: true` and a `reason`. _(planned — #28)_
 
 ## Project Structure
 
+The app lives at the repo **root** (there is no `src/` directory).
+
 ```
-src/
-├── app/                          # Next.js App Router
-│   ├── layout.tsx                # Root layout, providers
-│   ├── page.tsx                  # Main canvas page
-│   ├── globals.css               # Tailwind imports
-│   └── api/
-│       ├── mesh/route.ts         # GET: bulk fetch (concepts + connections + positions for viewport)
-│       ├── concepts/
-│       │   ├── route.ts          # GET (list/search), POST (create)
-│       │   └── [id]/
-│       │       ├── route.ts      # GET, PUT, DELETE single concept
-│       │       ├── generate/route.ts   # POST: trigger AI viz generation (SSE stream)
-│       │       └── expand/route.ts     # POST: generate sub-concepts for this concept
-│       ├── connections/route.ts  # GET, POST connections
-│       └── serendipity/route.ts  # GET: AI-surfaced unexpected connections
-│
-├── components/
-│   ├── canvas/
-│   │   ├── MeshCanvas.tsx        # React Flow canvas + d3-force integration
-│   │   ├── ConceptNode.tsx       # Custom node: concept card (adapts to zoom level)
-│   │   ├── ConnectionEdge.tsx    # Custom edge: color-coded connection line
-│   │   └── CanvasControls.tsx    # Zoom, fit, minimap
-│   ├── concept/
-│   │   ├── ConceptModal.tsx      # Focused modal for visualization
-│   │   └── ConceptSearch.tsx     # Search/create concepts
-│   ├── visualization/
-│   │   ├── VizRenderer.tsx       # iframe sandbox manager
-│   │   ├── VizPlaceholder.tsx    # Unexplored concept state
-│   │   └── VizError.tsx          # Error boundary
-│   └── serendipity/
-│       └── SerendipityBanner.tsx  # "Did you know X connects to Y?"
-│
-├── store/
-│   ├── meshStore.ts              # Nodes, edges, viewport, layout state
-│   ├── conceptStore.ts           # Concept data, generation status
-│   └── uiStore.ts                # Selection, modals, search
-│
-├── lib/
-│   ├── ai/
-│   │   ├── pipeline.ts           # Multi-shot generation pipeline
-│   │   ├── prompts.ts            # All prompt templates
-│   │   ├── serendipity.ts        # Serendipity engine
-│   │   └── techniqueMap.ts       # Concept → visualization technique mapping
-│   ├── db/
-│   │   ├── schema.ts             # Drizzle schema (4 tables + vectors)
-│   │   ├── client.ts             # Database client
-│   │   └── migrations/           # Drizzle migrations
-│   ├── graph/
-│   │   ├── layout.ts             # d3-force config and simulation
-│   │   ├── semanticZoom.ts       # Zoom-level detail logic
-│   │   └── clustering.ts         # Domain-based clustering
-│   └── eval/
-│       └── safeEval.ts           # Sandbox evaluation utilities
-│
-├── workers/
-│   └── forceLayout.worker.ts     # Web Worker for d3-force computation
-│
-└── types/
-    ├── concept.ts                # Concept, Connection, Visualization
-    └── mesh.ts                   # Node, Edge, Viewport
+app/                              # Next.js App Router
+├── layout.tsx                    # Root layout + providers
+├── page.tsx                      # Main canvas page
+├── globals.css                   # Tailwind + theme variables
+├── auth/signin/page.tsx          # Sign-in page
+├── settings/page.tsx             # Provider / API-key settings
+└── api/
+    ├── auth/[...nextauth]/route.ts   # NextAuth handler
+    ├── mesh/route.ts                 # GET viewport-bounded bulk fetch
+    ├── concepts/route.ts             # GET (list/search), POST (create)
+    ├── concepts/[id]/route.ts        # GET (concept + best card), PUT, DELETE
+    ├── connections/route.ts          # GET, POST concept edges
+    └── user/
+        ├── api-key/route.ts          # store/clear the user's encrypted provider key
+        └── favorites/route.ts        # GET/POST/DELETE favorites
+
+components/
+├── canvas/{MeshCanvas,ConceptNode,ConnectionEdge}.tsx
+├── card/CardViewer.tsx           # sandboxed iframe card renderer
+├── concept/ConceptModal.tsx      # focused modal around the card
+├── auth/UserMenu.tsx
+├── providers/SessionProvider.tsx
+└── serendipity/SerendipityBanner.tsx
+
+store/
+├── meshStore.ts                  # nodes, edges, viewport, layout state
+└── uiStore.ts                    # selection, modals, search
+
+lib/
+├── ai/client.ts                  # Anthropic client + key resolution
+├── auth.ts, auth.config.ts       # NextAuth config
+├── crypto.ts                     # encrypt/decrypt user API keys
+├── db/{client,schema,seed}.ts    # Drizzle client, schema, seed
+├── db/migrations/                # checked-in SQL migrations + meta
+├── db/seed-cards/*.html          # reference seed card HTML
+└── graph/layout.ts               # d3-force config
+
+types/
+├── concept.ts                    # Concept, ConceptCard, ConceptEdge, ConceptDetail, MeshData
+└── mesh.ts                       # ConceptNode/Edge data, Viewport, zoom thresholds
 ```
+
+**Not yet built** (each has an epic issue): provider adapter layer (`lib/ai/adapters/`, #11–#14),
+generation/expand/validate/serendipity routes (`app/api/cards/*`, `app/api/serendipity`, #9, #17, #19, #28),
+import & embed routes (#20, #21), the d3-force Web Worker, and the `docs/` card spec (#8, PR #35).
+Do not assume these exist — check the tree.
 
 ## Database Schema
 
-Four core tables + vector embeddings:
+Defined in `lib/db/schema.ts` (Drizzle). Migrations are checked into
+`lib/db/migrations/`. The concept primary key is its **`slug`**, not a numeric id.
 
-### concepts
-- `id` (text, PK, slug like "binary-search")
-- `name` (text, not null)
-- `domain` (text, not null)
-- `explanation` (text, not null)
-- `difficulty` (text, nullable: beginner/intermediate/advanced)
-- `metadata` (jsonb, extensible)
-- `embedding` (vector(1536), for semantic search)
-- `created_at`, `updated_at` (timestamps)
+**NextAuth tables:** `users` (includes `encrypted_api_key`), `accounts`, `sessions`,
+`verification_tokens`.
 
-### connections
-- `id` (uuid, PK)
-- `source_id` (FK → concepts)
-- `target_id` (FK → concepts)
-- `type` (text, default "related" — extensible later)
-- `strength` (float, default 1.0 — for layout weighting)
-- `ai_generated` (boolean)
-- `reason` (text, nullable — "why this connection exists")
-- `created_at` (timestamp)
-- Unique constraint on (source_id, target_id)
+**Domain tables:**
 
-### visualizations
-- `id` (uuid, PK)
-- `concept_id` (FK → concepts, not null)
-- `code` (text, not null — the React.createElement arrow function)
-- `plan` (text, nullable — AI planning output)
-- `version` (integer, default 1)
-- `is_active` (boolean, default true)
-- `created_at` (timestamp)
+- **`concepts`** — `slug` (PK), `title`, `domain`, `description`, `embedding` (vector 1536,
+  nullable), `best_card_id` (→ `concept_cards`), `card_count`, timestamps.
+- **`concept_cards`** — `id` (uuid PK), `slug` (→ concepts), `version`, denormalized
+  `title`/`domain`/`description`/`tags`/`difficulty`, `html`, `thumbnail`,
+  `interactivity_level`, `status` (`draft|validating|published|flagged`), validation fields,
+  provenance (`author_id`, `generated_with`, `generation_prompt`, `parent_card_id` for remixes),
+  community counters (`upvotes`, `views`, `embed_count`). Unique on (`slug`, `version`).
+- **`concept_edges`** — `id` (uuid PK), `source_slug`, `target_slug`, `relationship`
+  (`related|prerequisite|application|contrast|analogy`), `reason`, `ai_generated`. Unique on
+  (`source_slug`, `target_slug`). _(This replaced the old `connections` table.)_
+- **`node_positions`** — `concept_slug` (PK), `x`, `y`, `updated_at`.
+- **`favorites`** — (`user_id`, `concept_slug`) composite PK.
 
-### node_positions
-- `concept_id` (FK → concepts, PK)
-- `x`, `y` (float)
-- `updated_at` (timestamp)
+> The v1 `visualizations` table was dropped (migration `0002_drop_visualizations.sql`).
+> Cards live in `concept_cards`.
 
 ## API Design
 
-| Method | Endpoint | Purpose |
-|--------|----------|---------|
-| GET | `/api/mesh?x=&y=&zoom=&radius=` | Viewport-based bulk fetch |
-| GET | `/api/concepts?q=&domain=` | Search/list concepts |
-| POST | `/api/concepts` | Create concept |
-| GET | `/api/concepts/[id]` | Get concept + active visualization |
-| PUT | `/api/concepts/[id]` | Update concept |
-| POST | `/api/concepts/[id]/generate` | Trigger AI viz generation (SSE) |
-| POST | `/api/concepts/[id]/expand` | Generate sub-concepts (SSE) |
-| GET | `/api/connections` | List connections |
-| POST | `/api/connections` | Create connection |
-| GET | `/api/serendipity` | Get unexpected connection suggestion |
+| Method | Endpoint | Purpose | Status |
+|--------|----------|---------|--------|
+| GET | `/api/mesh?x=&y=&radius=` | Viewport-bounded concepts + edges + positions | ✅ built |
+| GET/POST | `/api/concepts` | List/search / create concept | ✅ built |
+| GET/PUT/DELETE | `/api/concepts/[id]` | Concept + best card / update / delete | ✅ built |
+| GET/POST | `/api/connections` | List / create concept edges | ✅ built |
+| POST/DELETE | `/api/user/api-key` | Store / clear encrypted provider key | ✅ built |
+| GET/POST/DELETE | `/api/user/favorites` | Manage favorites | ✅ built |
+| `*` | `/api/auth/[...nextauth]` | NextAuth | ✅ built |
+| POST | `/api/cards/generate` | Concept → card (SSE) | ⏳ #17 |
+| POST | `/api/cards/validate` | Playwright validation + thumbnail | ⏳ #9 |
+| POST | `/api/concepts/[id]/expand` | Generate sub-concepts | ⏳ #19 |
+| GET | `/api/serendipity` | Surface an unexpected connection | ⏳ #28 |
+| GET | `/embed/[cardId]` | Public card embed | ⏳ #21 |
 
 ## Coding Standards
 
 ### General
-- TypeScript strict mode. No `any` unless absolutely unavoidable.
+- TypeScript strict mode. No `any` unless truly unavoidable (justify in a comment).
 - Functional components only. No class components.
-- Named exports for components, default export only for pages.
-- Keep files under 200 lines. If longer, split.
-- No barrel exports (index.ts re-exports). Import directly from the file.
+- Named exports for components; default export only for Next.js pages.
+- Keep files under ~200 lines. If longer, split.
+- No barrel exports (`index.ts` re-exports). Import directly from the file.
+- Nullable numbers: compare with `!= null`, never a truthy check (`if (count)` skips `0`).
 
 ### State
 - Zustand stores are the single source of truth.
-- No prop drilling deeper than 2 levels — use store hooks instead.
+- No prop drilling deeper than 2 levels — use store hooks.
 - Zustand actions are defined inside the store, not in components.
+- Subscribe with selectors to avoid unnecessary re-renders.
 
 ### AI Pipeline
-- All prompts live in `src/lib/ai/prompts.ts` as template functions.
-- Never hardcode model names — use environment variables.
-- Always stream generation progress to the client.
-- Generated code MUST be validated before saving to DB.
+- All prompts live under `lib/ai/` as template functions — never inline in routes.
+- Never hardcode model names — read from env (`ANTHROPIC_MODEL`, adapter config).
+- Always stream generation progress to the client (SSE).
+- Generated card HTML MUST pass validation before it is saved with `status: published`.
+- API keys are per-request/per-user and encrypted; never store a plaintext key in the DB.
 
 ### Database
-- All DB access goes through Drizzle ORM. No raw SQL in route handlers.
-- Migrations are checked into git.
+- All DB access goes through Drizzle. No raw SQL in route handlers (parameterized
+  `sql` for vector ops in `lib/` is fine).
+- Migrations are checked into git; generate with `npm run db:generate`.
 - Use transactions for multi-table writes.
+- Scope user-owned reads/writes by `userId`.
 
 ### Styling
-- Tailwind utility classes for layout and spacing.
-- CSS variables for the color theme (dark space theme: deep indigo/purple).
-- Mobile-first responsive: touch interactions, full-screen modal on mobile.
-
-## Visual Design Direction
-
-- Dark background: deep space gradient (slate-900 → indigo-950)
-- Cards: frosted glass effect with subtle borders
-- Connections: soft glowing lines, color-coded by relationship type
-- Unexplored nodes: dimmer, slightly pulsing, inviting interaction
-- Explored nodes: vibrant, with a subtle glow
-- The mesh should feel alive — gentle drift, subtle particle effects
-- Modal: slides up from the card position, fills focus area
-- Typography: system-ui, clean, high contrast on dark
-
-## Environment Variables
-
-```env
-ANTHROPIC_API_KEY=           # Server-side only
-DATABASE_URL=                # PostgreSQL connection string (Neon)
-EMBEDDING_MODEL=             # Model for concept embeddings (default: voyage or similar)
-NEXT_PUBLIC_APP_URL=         # Public URL for the app
-```
-
-## Build Order
-
-### Phase 1: Foundation
-- Next.js scaffold with TypeScript, Tailwind, App Router
-- PostgreSQL schema with Drizzle + pgvector
-- Seed data migration (5 starter concepts from prototype)
-- Core API routes: /api/mesh, /api/concepts, /api/connections
-
-### Phase 2: The Canvas
-- React Flow canvas with custom ConceptNode component
-- d3-force layout engine in Web Worker
-- Custom ConnectionEdge component
-- Pan, zoom, drag, touch interactions
-
-### Phase 3: AI Generation
-- Port multi-shot pipeline to server-side Route Handlers
-- SSE streaming for generation progress
-- iframe sandbox for visualization rendering
-- ConceptModal with VizRenderer
-
-### Phase 4: Semantic Zoom + Expansion
-- Zoom-level-dependent node detail
-- Concept expansion (click unexplored → AI generates sub-concepts)
-- Concept search and creation
-- Position persistence
-
-### Phase 5: Serendipity
-- Concept embedding on creation
-- Vector similarity queries for unexpected connections
-- Claude-powered connection articulation
-- SerendipityBanner UI
-
-### Phase 6: Polish
-- Mobile responsive pass
-- Performance optimization (virtualization, lazy loading)
-- Error handling and edge cases
-- Visual polish (animations, particles, glow effects)
-
-## Review Agents
-
-Custom slash commands for quality gates. Run these before merging any PR or after significant changes.
-
-| Command | Purpose | When to Run |
-|---------|---------|-------------|
-| `/review-code` | Coding standards compliance | Every PR, every significant change |
-| `/review-security` | Security audit (sandbox, API, secrets) | Any change to viz pipeline, API routes, or iframe code |
-| `/review-viz` | Validate AI-generated visualization code | After pipeline changes or new viz generation |
-| `/review-pr` | Full PR review (architecture + breaking changes) | Before merging any PR |
-| `/review-perf` | Performance audit (canvas, layout, data loading) | After canvas/layout/store changes |
-| `/review-a11y` | Accessibility audit (modals, keyboard, contrast) | After UI component changes |
-
-### When to Run Reviews
-- **Before every merge**: `/review-pr` (includes code + architecture)
-- **After touching `lib/ai/` or `VizRenderer`**: `/review-security` + `/review-viz`
-- **After touching `components/` or `store/`**: `/review-perf` + `/review-a11y`
-- **After adding dependencies**: `/review-code` (license check) + `/review-security` (CVE check)
+- Tailwind utilities for layout/spacing; `--cm-*` CSS variables for the theme.
+- Dark space theme (slate-900 → indigo-950), frosted-glass cards, glowing edges.
+- Mobile-first: touch interactions, full-screen modal on mobile.
 
 ## Error Handling Patterns
 
-### API Routes
-- Return structured JSON errors: `{ error: string, code?: string }`
-- Use appropriate HTTP status codes: 400 (bad input), 404 (not found), 500 (server error)
-- Never leak stack traces or internal details in production
-- Log errors server-side with context (concept ID, operation name)
+- **API routes:** structured JSON errors `{ error: string, code?: string }`; correct status
+  codes (400 bad input, 401/403 auth, 404 not found, 429 rate limit, 500 server). Never leak
+  stack traces. Log server-side with context (concept slug, operation).
+- **SSE streams:** emit `event: error` with a JSON payload on failure, and always a final
+  `event: done`. The client closes the `EventSource` on `done` and on unmount.
+- **Canvas:** per-node React Flow error boundary; card iframe errors caught via `postMessage`
+  and shown in a fallback; network failures show a retry prompt, never a crash.
+- **Store actions:** optimistic updates with rollback on API failure; never leave the store
+  inconsistent.
 
-### SSE Streams
-- Send `event: error` with JSON payload on failure
-- Always send `event: done` to signal completion (even on error)
-- Client must close EventSource on unmount and on `done` event
+## Review Agents
 
-### Canvas Components
-- React Flow error boundary catches rendering errors per-node
-- Visualization iframe errors are caught via postMessage and displayed in VizError
-- Network failures show a retry prompt, not a crash
+Six custom slash commands in `.claude/commands/` are quality gates. `/review` auto-dispatches
+by file type; run the specific ones directly when you know what changed.
 
-### Store Actions
-- Optimistic updates with rollback on API failure
-- Never leave store in an inconsistent state — use immer or replace atomically
+| Command | Purpose | When |
+|---------|---------|------|
+| `/review-code` | Coding-standards compliance | Every significant change |
+| `/review-security` | Sandbox / API / secrets audit | viz pipeline, API routes, iframe code |
+| `/review-viz` | Validate AI-generated card HTML | after pipeline changes / new cards |
+| `/review-perf` | Canvas / layout / data-loading perf | after canvas/layout/store changes |
+| `/review-a11y` | Accessibility audit | after UI changes |
+| `/review-pr` | Full PR review (architecture + breaking) | before merging any PR |
 
-## Testing Strategy
+## Working an Issue: `/ship`, `/loop`, and reviews
 
-### Unit Tests (Vitest — when added)
-- `lib/ai/pipeline.ts` — mock Anthropic SDK, test plan/generate/validate flow
-- `lib/ai/techniqueMap.ts` — concept-to-technique mapping
-- `lib/graph/layout.ts` — d3-force config produces valid positions
-- `lib/db/schema.ts` — Drizzle schema matches expected shape
-- Store actions — Zustand store state transitions
-
-### Integration Tests
-- API routes — test with real DB (Docker postgres), verify response shapes
-- AI generation → DB storage → API retrieval → VizRenderer round-trip
-
-### E2E Tests (Playwright — when added)
-- Load canvas, verify nodes render
-- Click concept → modal opens → visualization renders in iframe
-- Search for concept → navigate to it
-- Expand concept → new nodes appear on canvas
-
-### What NOT to Test
-- React Flow internals (library responsibility)
-- Tailwind class output (visual, not logical)
-- Third-party SDK behavior
+- **`/ship <issue#>`** — the primary driver. Takes a GitHub issue all the way to a
+  merge-ready PR: research → implement on a `feat|fix/issue-<n>-*` branch → open PR → then
+  watch review comments + CI until green and all threads are resolved. It **stops before
+  merging** (the human clicks merge). In web/remote sessions it prefers `subscribe_pr_activity`
+  over polling. See `.claude/commands/ship.md`.
+- **`/loop <interval> <prompt|/command>`** — a generic, *stateless* interval re-runner. Use it
+  for recurring chores that have no lifecycle of their own: sweeping Dependabot PRs, triaging
+  new issues, periodic link-checks. **Do not wrap `/ship` in `/loop`** — `ship` already runs
+  its own smarter, stateful, event-driven loop; nesting them double-schedules and fights
+  itself. Pick one: `ship` for an issue→PR lifecycle, `loop` for stateless repetition.
+- **`/github-ops`** — cheat-sheet mapping GitHub tasks to the exact `mcp__github__*` tool
+  (cloud/web sessions have no `gh` CLI).
+- **`/add-lesson`** — record a mistake in `CLAUDE-LESSONS.md` after review finds a pattern.
 
 ## Performance Budgets
 
@@ -326,27 +261,32 @@ Custom slash commands for quality gates. Run these before merging any PR or afte
 |--------|--------|
 | Canvas initial load (50 nodes) | < 2s |
 | Node click → modal open | < 200ms |
-| AI viz generation (full pipeline) | < 30s |
-| SSE first event (generation start) | < 1s |
-| Viewport pan (re-fetch nodes) | < 500ms |
+| AI card generation (full pipeline) | < 30s |
+| SSE first event | < 1s |
+| Viewport pan (re-fetch) | < 500ms |
 | d3-force layout (100 nodes) | < 1s |
-| Bundle size (client JS) | < 300KB gzipped |
+| Client JS bundle | < 300KB gzipped |
 
 ## Git Workflow
 
-- Branch naming: `feat/`, `fix/`, `refactor/`, `docs/` prefixes
-- **Semantic commits** (Conventional Commits format):
-  - `feat: add concept expansion API` — new feature (minor version bump)
-  - `fix: prevent duplicate connections` — bug fix (patch version bump)
-  - `refactor: extract layout logic to worker` — code restructuring, no behavior change
-  - `docs: update API endpoint table` — documentation only
-  - `chore: upgrade drizzle-orm to 0.35` — dependencies, config, tooling
-  - `style: align Tailwind class ordering` — formatting, no logic change
-  - `perf: virtualize off-screen nodes` — performance improvement
-  - `test: add pipeline unit tests` — adding or updating tests
-  - Use optional scope for context: `feat(canvas): add pinch-to-zoom`
-  - Breaking changes: add `!` suffix — `feat(api)!: change mesh endpoint response shape`
-  - Body (optional): imperative mood, describe the "why" not the "what"
-- Run `/review-pr` before merging
-- Database migrations get their own commit with `feat(db):` or `fix(db):` prefix
-- Never commit `.env` — use `.env.local.example` for templates
+- Branch prefixes: `feat/`, `fix/`, `refactor/`, `docs/`, `chore/`, `perf/`, `test/`, `style/`.
+- **Conventional Commits**: `type(scope): subject` (imperative, describe the *why* in the body).
+  Breaking changes take a `!`: `feat(api)!: change mesh response shape`.
+- Database migrations get their own commit: `feat(db):` / `fix(db):`.
+- A `PreToolUse` hook refuses commits/pushes on `main`/`master` — always work on a branch.
+- Run `/review-pr` before requesting merge. Never commit `.claude/ship-state/` (it pollutes
+  the PR diff — already gitignored). Never commit `.env*`; use `.env.local.example`.
+
+## Session Setup (cloud & local)
+
+`scripts/session-setup.sh` runs from the `SessionStart` hook: it installs npm deps when
+`package-lock.json` changed and regenerates Drizzle artifacts when the schema changed. It is
+idempotent and never blocks a session. Run it manually after a fresh clone if needed.
+
+## Specialized Docs
+
+- [`PROJECT.md`](PROJECT.md) — product vision and UX.
+- [`README.md`](README.md) — human setup, Docker, env vars.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — workflow, review matrix, ship/loop guidance.
+- [`CLAUDE-LESSONS.md`](CLAUDE-LESSONS.md) — recorded mistakes to avoid.
+- `docs/card-spec.md` — card HTML contract _(planned — #8, PR #35)_.

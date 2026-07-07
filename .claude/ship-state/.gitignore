@@ -1,0 +1,3 @@
+# Ephemeral ship-skill state — never commit (pollutes the PR diff).
+*
+!.gitignore

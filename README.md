@@ -6,7 +6,41 @@ AI-generated interactive visualization, and let the serendipity engine surface
 unexpected connections between distant ideas.
 
 See `PROJECT.md` for the product vision and `CLAUDE.md` for the architecture
-and coding standards.
+and coding standards (the latter is the authoritative, up-to-date map of the
+codebase). New here? `CONTRIBUTING.md` covers the day-to-day workflow.
+
+## Architecture at a glance
+
+ConceptMesh is a single Next.js 16 (App Router) app. The browser renders an
+infinite React Flow canvas; a Postgres + pgvector database holds concepts,
+cards, edges and positions; and all AI generation runs server-side in Route
+Handlers so provider API keys never reach the client.
+
+```
+┌──────────────────────────── Browser ────────────────────────────┐
+│  MeshCanvas (React Flow) ──▶ ConceptModal ──▶ CardViewer         │
+│      │  Zustand stores (meshStore, uiStore)     (sandboxed       │
+│      │                                            iframe)         │
+└──────┼───────────────────────────────────────────────────────────┘
+       │ fetch
+┌──────▼──────────────── Next.js Route Handlers ───────────────────┐
+│  /api/mesh   /api/concepts   /api/connections   /api/user/*      │
+│  /api/cards/generate ⏳  /api/serendipity ⏳   (AI, server-side)  │
+│      │ Drizzle ORM                    │ provider adapter          │
+└──────┼────────────────────────────────┼──────────────────────────┘
+       │                                 │ (key never sent to client)
+┌──────▼────────────┐            ┌───────▼──────────────────────────┐
+│ Postgres 16 +     │            │ Anthropic / OpenAI / OpenAI-compat│
+│ pgvector          │            │  ⏳ adapters — see issues #11–#15 │
+│  concepts, cards, │            └───────────────────────────────────┘
+│  edges, positions │
+└───────────────────┘   ⏳ = planned; see the roadmap issues on GitHub
+```
+
+A generated **card** is a string of self-contained HTML (inline CSS/JS, themed
+via `--cm-*` variables) that renders inside an `sandbox="allow-scripts"` iframe.
+The generation↔rendering contract is defined in `docs/card-spec.md`
+(tracked in [#8](https://github.com/home-lab-enterpises/concept-mesh/issues/8)).
 
 ## Tech stack
 
@@ -123,6 +157,28 @@ Six custom slash commands live in `.claude/commands/` as quality gates:
 | `/review-pr` | before merging any PR |
 | `/review-perf` | after canvas / layout / store changes |
 | `/review-a11y` | after UI component changes |
+
+## Contributing
+
+Start with `CONTRIBUTING.md` — it explains the branch/commit conventions, the
+review gates, and the agent workflow. In short:
+
+- **Pick up an issue** with `/ship <issue#>` (in Claude Code): it researches,
+  implements on a feature branch, opens a PR, and shepherds it to merge-ready.
+- **Contribute a card:** cards are self-contained HTML conforming to
+  `docs/card-spec.md`. You'll be able to paste one via the *Import Card* flow
+  ([#20](https://github.com/home-lab-enterpises/concept-mesh/issues/20)); until
+  then, add a reference card under `lib/db/seed-cards/` and wire it into
+  `lib/db/seed.ts`.
+- **Add a provider adapter:** implement the `ProviderAdapter` interface
+  ([#11](https://github.com/home-lab-enterpises/concept-mesh/issues/11)) under
+  `lib/ai/adapters/` and register it. Anthropic (#12), OpenAI (#13) and a
+  generic OpenAI-compatible adapter (#14) are the reference implementations.
+- **Every dependency must be MIT / ISC / Apache-2.0 / BSD** (or the equally
+  permissive PostgreSQL license). No GPL. Check before adding.
+
+Run `/review-pr` before requesting a merge. Never push to `main` — a git hook
+enforces this.
 
 ## License
 
