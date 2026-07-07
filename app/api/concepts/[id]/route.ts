@@ -11,6 +11,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     const concept = await db.query.concepts.findFirst({
       where: (c, { eq }) => eq(c.slug, id),
+      columns: { embedding: false },
     })
 
     if (!concept) {
