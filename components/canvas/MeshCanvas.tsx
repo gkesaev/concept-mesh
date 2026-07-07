@@ -29,7 +29,7 @@ function buildNodes(data: MeshData, positions: Map<string, { x: number; y: numbe
     position: positions.get(c.slug) ?? { x: 0, y: 0 },
     data: {
       concept: c,
-      status: 'unexplored',
+      status: c.cardCount > 0 ? ('explored' as const) : ('unexplored' as const),
     },
   }))
 }
