@@ -29,7 +29,7 @@ strings for a single provider (Anthropic). **v2 replaced that model:**
 | No auth | **NextAuth.js** (GitHub / Google OAuth) |
 | Single `visualizations` table | **`concept_cards`** with versions, status, votes, remixes |
 | Client-side in-memory cache | **PostgreSQL 16 + pgvector** via Drizzle |
-| Local render only | **Playwright** server-side card validation _(planned — #9)_ |
+| Local render only | **Playwright** server-side card validation |
 
 If you find a doc that describes `React.createElement`, `src/` layout, a `voyage`
 embedding default, or an `EMBEDDING_MODEL` env var, it is stale v1 — trust the schema in
@@ -48,7 +48,7 @@ embedding default, or an `EMBEDDING_MODEL` env var, it is stale v1 — trust the
 | ORM | Drizzle ORM | Apache-2.0 |
 | Auth | NextAuth.js (`next-auth@5`, Drizzle adapter) | ISC |
 | AI | `@anthropic-ai/sdk` today; provider adapters _(planned — #11)_ | MIT |
-| Card validation | Playwright (headless Chromium) _(planned — #9)_ | Apache-2.0 |
+| Card validation | Playwright (headless Chromium) | Apache-2.0 |
 | Viz sandboxing | iframe `sandbox="allow-scripts"` rendering self-contained HTML | N/A |
 
 **All dependencies MUST have MIT, ISC, Apache-2.0, or BSD (or the equally-permissive
@@ -97,6 +97,7 @@ app/                              # Next.js App Router
 ├── settings/page.tsx             # Provider / API-key settings
 └── api/
     ├── auth/[...nextauth]/route.ts   # NextAuth handler
+    ├── cards/validate/route.ts       # POST Playwright HTML validation + thumbnail
     ├── mesh/route.ts                 # GET viewport-bounded bulk fetch
     ├── concepts/route.ts             # GET (list/search), POST (create)
     ├── concepts/[id]/route.ts        # GET (concept + best card), PUT, DELETE
@@ -121,6 +122,7 @@ lib/
 ├── ai/client.ts                  # Anthropic client + key resolution
 ├── auth.ts, auth.config.ts       # NextAuth config
 ├── cards/theme.ts                # card theme CSS vars, injector, embed snippet builder
+├── cards/{validate,static-checks,screenshot,browser,validate-types}.ts  # Playwright card validation
 ├── crypto.ts                     # encrypt/decrypt user API keys
 ├── db/{client,schema,seed}.ts    # Drizzle client, schema, seed
 ├── db/migrations/                # checked-in SQL migrations + meta
@@ -133,7 +135,7 @@ types/
 ```
 
 **Not yet built** (each has an epic issue): provider adapter layer (`lib/ai/adapters/`, #11–#14),
-generation/expand/validate/serendipity routes (`app/api/cards/*`, `app/api/serendipity`, #9, #17, #19, #28),
+generation/expand/serendipity routes (`app/api/cards/generate`, `app/api/serendipity`, #17, #19, #28),
 import & embed routes (#20, #21), and the d3-force Web Worker.
 Do not assume these exist — check the tree.
 
@@ -174,8 +176,8 @@ Defined in `lib/db/schema.ts` (Drizzle). Migrations are checked into
 | POST/DELETE | `/api/user/api-key` | Store / clear encrypted provider key | ✅ built |
 | GET/POST/DELETE | `/api/user/favorites` | Manage favorites | ✅ built |
 | `*` | `/api/auth/[...nextauth]` | NextAuth | ✅ built |
+| POST | `/api/cards/validate` | Playwright validation + thumbnail | ✅ built |
 | POST | `/api/cards/generate` | Concept → card (SSE) | ⏳ #17 |
-| POST | `/api/cards/validate` | Playwright validation + thumbnail | ⏳ #9 |
 | POST | `/api/concepts/[id]/expand` | Generate sub-concepts | ⏳ #19 |
 | GET | `/api/serendipity` | Surface an unexpected connection | ⏳ #28 |
 | GET | `/embed/[cardId]` | Public card embed | ⏳ #21 |
