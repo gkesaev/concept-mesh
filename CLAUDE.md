@@ -24,7 +24,7 @@ strings for a single provider (Anthropic). **v2 replaced that model:**
 
 | v1 (prototype) | v2 (current) |
 |---|---|
-| `React.createElement` code strings | **Self-contained HTML cards** (inline CSS/JS, `--cm-*` theme vars) — see [`docs/card-spec.md`](docs/card-spec.md) _(planned — #8, PR #35)_ |
+| `React.createElement` code strings | **Self-contained HTML cards** (inline CSS/JS, `--cm-*` theme vars) — see [`docs/card-spec.md`](docs/card-spec.md) |
 | Anthropic-only, key in env | **Multi-provider adapters** (Anthropic / OpenAI / OpenAI-compatible), per-user encrypted keys _(planned — #11–#15)_ |
 | No auth | **NextAuth.js** (GitHub / Google OAuth) |
 | Single `visualizations` table | **`concept_cards`** with versions, status, votes, remixes |
@@ -74,8 +74,9 @@ PostgreSQL) license. No GPL. Check before adding.**
   through `--cm-bg`, `--cm-text`, `--cm-accent`, `--cm-surface`, `--cm-border`.
 - Rendered by `components/card/CardViewer.tsx` inside an iframe with `sandbox="allow-scripts"`
   (no `allow-same-origin`, no `allow-popups`). Communication via `postMessage`.
-- An error boundary wraps the viewer — broken card code never crashes the app.
-- The generation↔rendering contract is `docs/card-spec.md` _(planned — #8, PR #35)_.
+- An error boundary (`components/card/CardErrorBoundary.tsx`) wraps the viewer — broken card
+  code never crashes the app.
+- The generation↔rendering contract is [`docs/card-spec.md`](docs/card-spec.md).
 
 ### Serendipity is Semantic, Not Random
 - Every concept description is embedded as a `vector(1536)` (pgvector).
@@ -106,7 +107,7 @@ app/                              # Next.js App Router
 
 components/
 ├── canvas/{MeshCanvas,ConceptNode,ConnectionEdge}.tsx
-├── card/CardViewer.tsx           # sandboxed iframe card renderer
+├── card/{CardViewer,CardErrorBoundary,CardEmbedPanel}.tsx  # sandboxed iframe card renderer
 ├── concept/ConceptModal.tsx      # focused modal around the card
 ├── auth/UserMenu.tsx
 ├── providers/SessionProvider.tsx
@@ -119,6 +120,7 @@ store/
 lib/
 ├── ai/client.ts                  # Anthropic client + key resolution
 ├── auth.ts, auth.config.ts       # NextAuth config
+├── cards/theme.ts                # card theme CSS vars, injector, embed snippet builder
 ├── crypto.ts                     # encrypt/decrypt user API keys
 ├── db/{client,schema,seed}.ts    # Drizzle client, schema, seed
 ├── db/migrations/                # checked-in SQL migrations + meta
@@ -132,7 +134,7 @@ types/
 
 **Not yet built** (each has an epic issue): provider adapter layer (`lib/ai/adapters/`, #11–#14),
 generation/expand/validate/serendipity routes (`app/api/cards/*`, `app/api/serendipity`, #9, #17, #19, #28),
-import & embed routes (#20, #21), the d3-force Web Worker, and the `docs/` card spec (#8, PR #35).
+import & embed routes (#20, #21), and the d3-force Web Worker.
 Do not assume these exist — check the tree.
 
 ## Database Schema
@@ -289,4 +291,4 @@ idempotent and never blocks a session. Run it manually after a fresh clone if ne
 - [`README.md`](README.md) — human setup, Docker, env vars.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — workflow, review matrix, ship/loop guidance.
 - [`CLAUDE-LESSONS.md`](CLAUDE-LESSONS.md) — recorded mistakes to avoid.
-- `docs/card-spec.md` — card HTML contract _(planned — #8, PR #35)_.
+- [`docs/card-spec.md`](docs/card-spec.md) — card HTML contract and validation checklist.

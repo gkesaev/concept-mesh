@@ -154,7 +154,7 @@ export function ConceptModal() {
           if (!result.card) {
             return <CardPanel>No published card for this concept yet.</CardPanel>
           }
-          return <CardViewer card={result.card} />
+          return <CardViewer card={result.card} theme="dark" />
         })()}
       </div>
     </div>
