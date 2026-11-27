@@ -7,6 +7,31 @@ const MAX_REQUEST_BYTES = MAX_CARD_BYTES + 64 * 1024
 
 export const runtime = 'nodejs'
 
+async function readBoundedText(req: NextRequest, maxBytes: number): Promise<string | 'TOO_LARGE'> {
+  if (!req.body) return ''
+  const reader = req.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      if (!value) continue
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel()
+        return 'TOO_LARGE'
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  return Buffer.concat(chunks, total).toString('utf8')
+}
+
 // POST /api/cards/validate — validate self-contained HTML card and generate thumbnail
 export async function POST(req: NextRequest) {
   const contentLengthHeader = req.headers.get('content-length')
@@ -20,14 +45,14 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  let rawBody: string
+  let rawBody: string | 'TOO_LARGE'
   try {
-    rawBody = await req.text()
+    rawBody = await readBoundedText(req, MAX_REQUEST_BYTES)
   } catch {
     return NextResponse.json({ error: 'Unable to read request body', code: 'BAD_REQUEST' }, { status: 400 })
   }
 
-  if (Buffer.byteLength(rawBody, 'utf8') > MAX_REQUEST_BYTES) {
+  if (rawBody === 'TOO_LARGE') {
     return NextResponse.json(
       { error: 'Request payload exceeds maximum card size (500 KB)', code: 'PAYLOAD_TOO_LARGE' },
       { status: 413 },
