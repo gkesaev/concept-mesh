@@ -43,7 +43,7 @@ export function CardEmbedPanel({ card, theme, onClose }: CardEmbedPanelProps) {
       className="mb-2 rounded-xl border border-indigo-400/30 bg-slate-950/90 p-3 text-xs text-slate-200"
     >
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="font-medium text-indigo-200">Iframe embed code</span>
+        <span className="font-medium text-indigo-200">Iframe embed code (preview)</span>
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -62,6 +62,11 @@ export function CardEmbedPanel({ card, theme, onClose }: CardEmbedPanelProps) {
           </button>
         </div>
       </div>
+
+      <p className="mb-2 text-[11px] text-slate-400">
+        Public card embed endpoints (<code className="text-slate-300">/embed/[cardId]</code>) are
+        not served yet and will go live in #21.
+      </p>
 
       <textarea
         readOnly

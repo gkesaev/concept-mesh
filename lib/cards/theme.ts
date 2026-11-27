@@ -40,11 +40,16 @@ export function injectCardTheme(html: string, theme: CardTheme = 'dark'): string
     .map(([key, value]) => `${key}:${value}`)
     .join(';')
   const style = `<style data-cm-host-theme>:root{color-scheme:${theme};${vars}}</style>`
-  const headClose = /<\/head>/i
-  if (headClose.test(html)) {
-    return html.replace(headClose, `${style}</head>`)
+  if (/<\/head>/i.test(html)) {
+    return html.replace(/<\/head>/i, match => `${style}${match}`)
   }
-  return style + html
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, match => `${style}${match}`)
+  }
+  if (/<\/html>/i.test(html)) {
+    return html.replace(/<\/html>/i, match => `${style}${match}`)
+  }
+  return `${html}${style}`
 }
 
 function escapeHtmlAttr(value: string): string {
