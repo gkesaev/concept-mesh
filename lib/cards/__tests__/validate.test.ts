@@ -84,11 +84,14 @@ describe('runStaticChecks', () => {
     expect(errors.some(e => e.includes('eval()'))).toBe(true)
   })
 
-  it('rejects missing --cm-* variables and unlabeled <main>', () => {
-    const broken = '<!doctype html><html><head><style>:root{--cm-bg:#000}</style></head><body><main>Hi</main></body></html>'
+  it('rejects missing --cm-* variables, unlabeled <main>, duplicate <main>, and relative image-set()', () => {
+    const broken =
+      '<!doctype html><html><head><style>:root{--cm-bg:#000}body{background:image-set("bg.png" 1x)}</style></head><body><main>Hi</main><main aria-label="Two">Two</main></body></html>'
     const errors = runStaticChecks(broken)
     expect(errors.some(e => e.includes('--cm-text'))).toBe(true)
     expect(errors.some(e => e.includes('accessible name'))).toBe(true)
+    expect(errors.some(e => e.includes('exactly one <main>'))).toBe(true)
+    expect(errors.some(e => e.includes('image-set()'))).toBe(true)
   })
 })
 

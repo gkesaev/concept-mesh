@@ -112,9 +112,19 @@ function checkCss(html: string, errors: string[]): void {
   }
 
   const urlRegex = /url\(\s*(?:"([^"]*)"|'([^']*)'|([^)\s]+))\s*\)/gi
+  const imageSetRegex = /\bimage-set\s*\(([^)]*)\)/gi
   for (const css of urlSources) {
-    if (/\bimage-set\s*\(/i.test(css) && /https?:|\/\//i.test(css)) {
-      errors.push('Prohibited external URL in CSS image-set()')
+    let setMatch: RegExpExecArray | null
+    while ((setMatch = imageSetRegex.exec(css)) !== null) {
+      const quotedRegex = /"([^"]*)"|'([^']*)'/g
+      let qMatch: RegExpExecArray | null
+      while ((qMatch = quotedRegex.exec(setMatch[1])) !== null) {
+        const target = qMatch[1] ?? qMatch[2] ?? ''
+        if (!isAllowedResourceUri(target)) {
+          errors.push('Prohibited external URL in CSS image-set()')
+          break
+        }
+      }
     }
     let urlMatch: RegExpExecArray | null
     while ((urlMatch = urlRegex.exec(css)) !== null) {
@@ -161,11 +171,17 @@ export function runStaticChecks(html: string): string[] {
   if (!/<head\b/i.test(html)) errors.push('Missing <head> element')
   if (!/<body\b/i.test(html)) errors.push('Missing <body> element')
 
-  const mainMatch = html.match(/<main\b([^>]*)>/i)
-  if (!mainMatch) {
+  const mainMatches = html.match(/<main\b([^>]*)>/gi) ?? []
+  const [firstMain] = mainMatches
+  if (!firstMain) {
     errors.push('Missing <main> root element')
-  } else if (!/\b(?:aria-label|aria-labelledby)\s*=\s*(?:"[^"]+"|'[^']+')/i.test(mainMatch[1])) {
-    errors.push('<main> element must provide an accessible name (aria-label or aria-labelledby)')
+  } else {
+    if (mainMatches.length > 1) {
+      errors.push('Card must contain exactly one <main> element')
+    }
+    if (!/\b(?:aria-label|aria-labelledby)\s*=\s*(?:"[^"]+"|'[^']+')/i.test(firstMain)) {
+      errors.push('<main> element must provide an accessible name (aria-label or aria-labelledby)')
+    }
   }
 
   checkExternalResources(html, errors)

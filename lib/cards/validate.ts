@@ -3,6 +3,7 @@ import type { BrowserContext, ConsoleMessage } from 'playwright'
 import { closeValidationBrowser, getValidationBrowser } from '@/lib/cards/browser'
 import { analyzeScreenshot } from '@/lib/cards/screenshot'
 import { runStaticChecks } from '@/lib/cards/static-checks'
+import { injectCardTheme } from '@/lib/cards/theme'
 import type { ValidateCardOptions, ValidationResult } from '@/lib/cards/validate-types'
 
 const CARD_WIDTH = 600
@@ -11,9 +12,6 @@ const DEFAULT_TIMEOUT_MS = 10_000
 const SETTLE_DELAY_MS = 250
 const CONTEXT_CLOSE_TIMEOUT_MS = 2_000
 const HOST_URL = 'https://validator.conceptmesh.local/'
-
-const DEFAULT_THEME_STYLE =
-  '<style data-cm-host-theme>:root{color-scheme:dark;--cm-bg:#0b1020;--cm-surface:#141a2e;--cm-text:#e8ecff;--cm-accent:#7c5cff;--cm-border:#2a3150}</style>'
 
 function buildProbeScript(nonce: string): string {
   return `<script data-cm-val-probe>(function(){
@@ -30,20 +28,10 @@ return orig.apply(this,arguments);
 
 function instrumentCardHtml(html: string, nonce: string): string {
   const probe = buildProbeScript(nonce)
-  const output = /<head\b[^>]*>/i.test(html)
+  const withProbe = /<head\b[^>]*>/i.test(html)
     ? html.replace(/<head\b[^>]*>/i, match => `${match}${probe}`)
     : `${probe}${html}`
-
-  if (/<\/head>/i.test(output)) {
-    return output.replace(/<\/head>/i, match => `${DEFAULT_THEME_STYLE}${match}`)
-  }
-  if (/<\/body>/i.test(output)) {
-    return output.replace(/<\/body>/i, match => `${DEFAULT_THEME_STYLE}${match}`)
-  }
-  if (/<\/html>/i.test(output)) {
-    return output.replace(/<\/html>/i, match => `${DEFAULT_THEME_STYLE}${match}`)
-  }
-  return `${output}${DEFAULT_THEME_STYLE}`
+  return injectCardTheme(withProbe, 'dark')
 }
 
 function isAllowedRequestUrl(url: string): boolean {
@@ -197,7 +185,10 @@ export async function validateCard(
       }
     }
 
-    return await Promise.race([runRender(), deadlinePromise])
+    const renderPromise = runRender()
+    // Prevent late rejections after timeout closes the context from surfacing as unhandled
+    renderPromise.catch(() => {})
+    return await Promise.race([renderPromise, deadlinePromise])
   } catch (err: unknown) {
     const rawMsg = err instanceof Error ? err.message : 'Card validation failed'
     errors.add(rawMsg.split('\n')[0] || 'Card validation failed')

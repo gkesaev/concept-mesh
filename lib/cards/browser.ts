@@ -30,7 +30,7 @@ function resolveExecutablePath(): string | undefined {
 
 async function launchBrowser(): Promise<Browser> {
   const executablePath = resolveExecutablePath()
-  const browser = await chromium.launch({
+  return chromium.launch({
     headless: true,
     executablePath,
     args: [
@@ -40,12 +40,6 @@ async function launchBrowser(): Promise<Browser> {
       '--disable-gpu',
     ],
   })
-
-  browser.on('disconnected', () => {
-    browserPromise = null
-  })
-
-  return browser
 }
 
 /**
@@ -54,10 +48,18 @@ async function launchBrowser(): Promise<Browser> {
  */
 export async function getValidationBrowser(): Promise<Browser> {
   if (!browserPromise) {
-    browserPromise = launchBrowser().catch(err => {
-      browserPromise = null
-      throw err
-    })
+    const pending = launchBrowser()
+      .then(browser => {
+        browser.on('disconnected', () => {
+          if (browserPromise === pending) browserPromise = null
+        })
+        return browser
+      })
+      .catch(err => {
+        if (browserPromise === pending) browserPromise = null
+        throw err
+      })
+    browserPromise = pending
   }
 
   const browser = await browserPromise
