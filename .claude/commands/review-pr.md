@@ -36,6 +36,11 @@ Perform a thorough review of the current branch's changes against main. Combine 
 - Loading states exist for async operations
 - New concepts/connections flow through the full pipeline (DB → API → Store → Canvas)
 
+### Git History
+- Run `git log origin/main..HEAD --oneline` — every commit tells a clear, atomic part of the change
+- Zero process-chatter commits (`address review comments`, `self-review`, `fix lint`, `WIP`) — review fixes must be amended or fixup-rebased into the introducing commit
+- Branch is cleanly rebased onto `origin/main` (no `Merge branch 'main'` commits)
+
 ## Output Format
 
 Structure the review as:

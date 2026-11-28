@@ -5,6 +5,24 @@ first. Prefer automating a lesson (ESLint rule, tighter types) over relying on t
 
 ---
 
+### 2026-11-27: Review fixes polluted git history with chatter commits
+
+- **Problem:** Pushing follow-up commits like `fix(...): address PR review comments` or
+  `fix(...): harden ... from self-review` leaves meaningless review-process chatter in git
+  history forever instead of a clean story of how the codebase was built.
+- **Root Cause:** `.claude/commands/ship.md` instructed agents to commit review fixes as
+  separate `fix(<scope>): address review feedback` commits and had a blanket `Never force-push`
+  rule that prevented amending/rebasing PR branches.
+- **Fix:** Treat git history as a curated development story. Every fix made during a PR
+  (whether from self-review, subagent review, CodeRabbit, CI, or human review) MUST be folded
+  back into the commit that introduced the code via `git commit --amend` or
+  `git commit --fixup <sha>` + `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`,
+  then pushed to the PR branch with `git push --force-with-lease`. Never leave
+  "address review comments" commits in history.
+- **Files:** `CLAUDE.md`, `CONTRIBUTING.md`, `.claude/commands/ship.md`, `.claude/settings.json`.
+- **Automated:** Partially — `.claude/settings.json` allows `git rebase`, and `.claude/hooks/block-main-write.sh`
+  prevents commits/pushes to `main`/`master`.
+
 ### 2026-07-07: Docs drifted a whole major version behind the code
 
 - **Problem:** `CLAUDE.md` and `init.md` described the v1 prototype (`src/` layout,

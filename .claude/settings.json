@@ -4,6 +4,7 @@
       "Bash(npm run build:*)",
       "Bash(npm run lint:*)",
       "Bash(npm run dev:*)",
+      "Bash(npm test:*)",
       "Bash(npm run db:generate:*)",
       "Bash(npm run db:migrate:*)",
       "Bash(npm run db:seed:*)",
@@ -22,6 +23,7 @@
       "Bash(git switch:*)",
       "Bash(git checkout -b:*)",
       "Bash(git commit:*)",
+      "Bash(git rebase:*)",
       "Bash(git push:*)"
     ],
     "deny": [],

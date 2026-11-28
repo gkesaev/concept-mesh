@@ -26,22 +26,28 @@ In Claude Code sessions this is mostly automatic: `scripts/session-setup.sh` (ru
 - **Conventional Commits**: `type(scope): subject` — imperative, subject describes *what*, body
   the *why*. Breaking changes take `!` (`feat(api)!: …`). Schema migrations get their own
   `feat(db):` / `fix(db):` commit.
+- **Clean, rebase-driven history.** Every commit in a PR must be a meaningful step in the
+  repository's development story. Never commit review-process noise (`fix: address review
+  comments`, `fix: self-review`, `fix: lint`, `WIP`). Fold review and CI fixes into the commit
+  that introduced the code (`git commit --amend` or `git commit --fixup <sha>` +
+  `git rebase -i --autosquash origin/main`) and update the PR with
+  `git push --force-with-lease`. Rebase PR branches onto `origin/main` instead of merging `main`.
 - Never commit `.env*` (use `.env.local.example`) or `.claude/ship-state/` (gitignored — it
   pollutes the PR diff).
 
 ## Validation before you push
 
-concept-mesh doesn't have a test runner yet (Vitest/Playwright are planned — see `CLAUDE.md`).
-Until then, the gate is:
+Run the full validation gate before pushing:
 
 ```bash
 npm run lint          # eslint
 npx tsc --noEmit      # TypeScript strict
+npm test              # Vitest suite
 npm run build         # Next.js build — catches route/type/bundling errors
 ```
 
 For schema changes also run `npm run db:generate` and commit the resulting migration. Never
-push with a failing lint, type-check, or build. When tests land, add `npm test` to this list.
+push with a failing lint, type-check, test, or build.
 
 ## Review gates
 
