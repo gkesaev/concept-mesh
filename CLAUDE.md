@@ -274,8 +274,23 @@ by file type; run the specific ones directly when you know what changed.
 ## Git Workflow
 
 - Branch prefixes: `feat/`, `fix/`, `refactor/`, `docs/`, `chore/`, `perf/`, `test/`, `style/`.
-- **Conventional Commits**: `type(scope): subject` (imperative, describe the *why* in the body).
-  Breaking changes take a `!`: `feat(api)!: change mesh response shape`.
+- **Conventional Commits**: `type(scope): subject` (imperative, describe *what* and *why* — never
+  process chatter). Breaking changes take a `!`: `feat(api)!: change mesh response shape`.
+- **Clean, rebase-driven history is mandatory.** Git history is a permanent story of how the
+  repository evolved; every commit on a PR branch must be atomic, purposeful, and self-contained.
+  - **NEVER** create commits like `fix: address review comments`, `fix: self-review findings`,
+    `fix: lint`, `WIP`, or `oops`. That noise does not belong in git history.
+  - When fixing bugs or review feedback discovered during a PR (self-review, subagent review,
+    CodeRabbit, CI, or human review), **amend or squash the fix into the commit that introduced
+    the code**:
+    - Single-commit PR: `git commit --amend` (update the commit message if scope expanded).
+    - Multi-commit PR: `git commit --fixup <target-sha>` followed by
+      `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`.
+  - Rebase PR branches cleanly onto `origin/main` rather than merging `main` into feature
+    branches.
+  - Push rewritten feature branches with `git push --force-with-lease` (never raw `--force`,
+    and never force-push `main`/`master`). On single-branch remote clones, pass the explicit
+    expected ref: `git push --force-with-lease=<branch>:<remote-sha> origin <branch>`.
 - Database migrations get their own commit: `feat(db):` / `fix(db):`.
 - A `PreToolUse` hook refuses commits/pushes on `main`/`master` — always work on a branch.
 - Run `/review-pr` before requesting merge. Never commit `.claude/ship-state/` (it pollutes

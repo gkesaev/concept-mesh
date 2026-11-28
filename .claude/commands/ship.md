@@ -41,7 +41,8 @@ This runs in **cloud/web sessions where `gh` is NOT installed** — use the GitH
 - CI → `pull_request_read` `get_check_runs`. **Do not** use `get_status` (returns 403 for the MCP app).
 - reply to a thread → `add_reply_to_pull_request_comment`; resolve → `pull_request_review_write`
   (`method: resolve_thread`).
-- push a fix → `push_files` (or commit on the branch and `git push`; CI re-triggers on push).
+- push a fix → amend/fixup-rebase into the introducing commit and `git push --force-with-lease`
+  (CI re-triggers on push; never leave `address review feedback` commits in history).
 
 **Prefer subscription over polling.** In this environment `subscribe_pr_activity` is available —
 subscribe to the PR once, then end the turn. CI and review events wake the session as
@@ -114,17 +115,17 @@ scope becomes a follow-up issue, not extra commits on this PR.
 
 ### Validation (concept-mesh)
 
-concept-mesh has no test or `pre-submit` script yet — validate with:
+Validate before pushing:
 
 ```bash
 npm run lint          # eslint
 npx tsc --noEmit      # TypeScript strict type-check
+npm test              # Vitest suite
 npm run build         # Next.js production build (catches route/type/bundling errors)
 ```
 
 If a change touches the schema, also run `npm run db:generate` and confirm the migration is
-clean. When a test runner is added (Vitest/Playwright — see `CLAUDE.md`), add `npm test` here.
-Never push with a failing lint, type-check, or build.
+clean. Never push with a failing lint, type-check, test, or build.
 
 ---
 
@@ -164,15 +165,24 @@ Treat bot reviewers (CodeRabbit, Copilot) like any other reviewer — apply or r
 
 ### B.3 Apply fixes
 
-1. Apply edits. 2. Run the validation block above. 3. Fix root causes if anything fails
-(never `--no-verify`). 4. Commit with a focused message (`fix(<scope>): address review
-feedback`). 5. Push.
+1. Apply edits.
+2. Run the validation block above (`npm run lint`, `npx tsc --noEmit`, `npm test`, `npm run build`).
+3. Fix root causes if anything fails (never `--no-verify`).
+4. **Fold the fix into the commit that introduced the code** — never create noisy commits like
+   `fix(<scope>): address review feedback`, `fix: review comments`, or `fix: self-review`:
+   - Single-commit PR: `git add … && git commit --amend` (refresh the commit message only if
+     the change meaningfully expands what the commit introduces).
+   - Multi-commit PR: `git commit --fixup <introducing-sha>` then
+     `GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash origin/main`.
+5. Push the rewritten feature branch with `git push --force-with-lease` (on single-branch
+   remote clones, use `git push --force-with-lease=<branch>:<remote-sha> origin <branch>`).
 
 ### B.4 Reply to threads
 
-Every actionable comment gets a reply — `add_reply_to_pull_request_comment` with
-"Fixed in <sha>" for fixes, or the reasoning for anything you declined. Silence reads as
-ignored. Resolve threads you fixed (`pull_request_review_write` `resolve_thread`).
+Every actionable comment gets a reply — `add_reply_to_pull_request_comment` describing what
+changed and citing the updated commit (`Fixed — folded into <short-sha>`), or the reasoning for
+anything you declined. Silence reads as ignored. Resolve threads you fixed
+(`pull_request_review_write` `resolve_thread`).
 
 ### B.5 Check CI
 
@@ -226,7 +236,10 @@ backoff; or 24h elapse since `first_seen_at` with zero activity (comment asking 
 ## Guardrails
 
 - **Never merge.** The job ends at "merge-ready."
-- **Never force-push.** If history needs cleaning, ask.
+- **Keep git history clean — rebase/amend on PR branches, never raw `--force`.** Fold review
+  and CI fixes into their introducing commits (`git commit --amend` or `--fixup` +
+  `git rebase -i --autosquash`) and push with `git push --force-with-lease`. Never force-push
+  `main`/`master`, never use raw `--force`, and never leave `address review comments` commits.
 - **Never bypass hooks** (`--no-verify`) or push a failing lint/type-check/build.
 - **Never push to `main`** — a hook blocks it anyway.
 - **Never expand scope** — new findings go to a follow-up issue.
