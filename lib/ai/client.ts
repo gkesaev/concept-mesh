@@ -6,24 +6,43 @@ import { decrypt } from '@/lib/crypto'
 export const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-5'
 
 /**
+ * Reads and decrypts the signed-in user's legacy DB-stored Anthropic API key, if present.
+ * Intended as an optional fallback for `resolveProvider({ loadLegacyUserApiKey })`.
+ * Returns `null` if decryption fails (e.g. missing/rotated ENCRYPTION_KEY) so callers fall back cleanly.
+ */
+export async function getStoredUserAnthropicKey(): Promise<string | null> {
+  const session = await auth()
+  const userId = session?.user?.id
+  if (!userId) return null
+
+  const user = await db.query.users.findFirst({
+    where: (u, { eq }) => eq(u.id, userId),
+    columns: { encryptedApiKey: true },
+  })
+
+  if (!user?.encryptedApiKey) return null
+
+  try {
+    return decrypt(user.encryptedApiKey)
+  } catch (err) {
+    console.error('[ai/client] Failed to decrypt stored user API key', {
+      userId,
+      reason: err instanceof Error ? err.message : 'unknown error',
+    })
+    return null
+  }
+}
+
+/**
  * Get an Anthropic client using the authenticated user's API key.
  * Falls back to the server ANTHROPIC_API_KEY if set.
  * Throws if no key is available.
  */
 export async function getAnthropicClient(): Promise<Anthropic> {
   // Try user's own key first
-  const session = await auth()
-  const userId = session?.user?.id
-  if (userId) {
-    const user = await db.query.users.findFirst({
-      where: (u, { eq }) => eq(u.id, userId),
-      columns: { encryptedApiKey: true },
-    })
-
-    if (user?.encryptedApiKey) {
-      const apiKey = decrypt(user.encryptedApiKey)
-      return new Anthropic({ apiKey })
-    }
+  const userKey = await getStoredUserAnthropicKey()
+  if (userKey) {
+    return new Anthropic({ apiKey: userKey })
   }
 
   // Fall back to server key
