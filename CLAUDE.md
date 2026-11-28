@@ -25,7 +25,7 @@ strings for a single provider (Anthropic). **v2 replaced that model:**
 | v1 (prototype) | v2 (current) |
 |---|---|
 | `React.createElement` code strings | **Self-contained HTML cards** (inline CSS/JS, `--cm-*` theme vars) — see [`docs/card-spec.md`](docs/card-spec.md) |
-| Anthropic-only, key in env | **Multi-provider adapters** (registry built; Anthropic / OpenAI / OpenAI-compatible adapters & settings UI _planned — #12–#15_) |
+| Anthropic-only, key in env | **Multi-provider adapters** (registry + Anthropic adapter built; OpenAI / OpenAI-compatible adapters & settings UI _planned — #13–#15_) |
 | No auth | **NextAuth.js** (GitHub / Google OAuth) |
 | Single `visualizations` table | **`concept_cards`** with versions, status, votes, remixes |
 | Client-side in-memory cache | **PostgreSQL 16 + pgvector** via Drizzle |
@@ -47,7 +47,7 @@ embedding default, or an `EMBEDDING_MODEL` env var, it is stale v1 — trust the
 | Database | PostgreSQL 16 + pgvector | PostgreSQL (permissive) |
 | ORM | Drizzle ORM | Apache-2.0 |
 | Auth | NextAuth.js (`next-auth@5`, Drizzle adapter) | ISC |
-| AI | Provider adapter registry (`lib/ai/adapters/`); `@anthropic-ai/sdk` + concrete adapters _(planned — #12–#14)_ | MIT |
+| AI | Provider adapter registry + Anthropic (`@anthropic-ai/sdk`) adapter (`lib/ai/adapters/`); OpenAI / OpenAI-compat adapters _(planned — #13–#14)_ | MIT |
 | Card validation | Playwright (headless Chromium) | Apache-2.0 |
 | Viz sandboxing | iframe `sandbox="allow-scripts"` rendering self-contained HTML | N/A |
 
@@ -67,11 +67,13 @@ PostgreSQL) license. No GPL. Check before adding.**
   not stored in DB). Legacy DB-stored Anthropic keys (`users.encrypted_api_key`, `lib/crypto.ts`)
   remain supported as a fallback.
 - All AI calls will run in Next.js Route Handlers through the provider adapter registry
-  (`lib/ai/adapters/registry.ts`) and `resolveProvider()` (`lib/ai/resolve-provider.ts`) — both
-  modules exist today, while concrete adapters _(planned — #12–#14)_ and generation/expand/serendipity
-  routes _(planned — #17, #19, #28)_ are not wired yet. `resolveProvider()` resolves credentials
-  in order: per-request key → encrypted session cookie → legacy user DB key (Anthropic only) →
-  `DEFAULT_PROVIDER`/`DEFAULT_API_KEY` → `ANTHROPIC_API_KEY`.
+  (`lib/ai/adapters/registry.ts`), `ensureDefaultProvidersRegistered()`
+  (`lib/ai/adapters/register-defaults.ts`), and `resolveProvider()` (`lib/ai/resolve-provider.ts`) —
+  the Anthropic adapter (`lib/ai/adapters/anthropic.ts`) and shared card prompts (`lib/ai/prompts.ts`)
+  exist today, while OpenAI / OpenAI-compatible adapters _(planned — #13–#14)_ and
+  generation/expand/serendipity routes _(planned — #17, #19, #28)_ are not wired yet.
+  `resolveProvider()` resolves credentials in order: per-request key → encrypted session cookie →
+  legacy user DB key (Anthropic only) → `DEFAULT_PROVIDER`/`DEFAULT_API_KEY` → `ANTHROPIC_API_KEY`.
 - Generation streams progress to the client via SSE _(planned — #17)_.
 - Pipeline: Plan → Generate → Validate (Playwright) → Fix (one retry) → Save.
 
@@ -127,6 +129,8 @@ store/
 lib/
 ├── ai/
 │   ├── adapters/{types,registry,url-validation}.ts  # ProviderAdapter interface, server registry, SSRF URL checks
+│   ├── adapters/{anthropic,errors,retry,register-defaults}.ts  # Anthropic adapter, error mapping, backoff, default registration
+│   ├── prompts.ts                # shared card-spec system/user prompts & HTML fence extractor
 │   ├── {session-key,session-cookie}.ts  # AES-256-GCM HttpOnly session cookie key storage
 │   ├── resolve-provider.ts       # server-side provider + credential resolution
 │   └── client.ts                 # legacy Anthropic client + DB key fallback helper
@@ -144,8 +148,8 @@ types/
 └── mesh.ts                       # ConceptNode/Edge data, Viewport, zoom thresholds
 ```
 
-**Not yet built** (each has an epic issue): concrete provider adapters (`lib/ai/adapters/{anthropic,openai,openai-compat}.ts`, #12–#14),
-generation/expand/serendipity routes (`app/api/cards/generate`, `app/api/serendipity`, #17, #19, #28),
+**Not yet built** (each has an epic issue): OpenAI & OpenAI-compatible adapters (`lib/ai/adapters/{openai,openai-compat}.ts`, #13–#14),
+provider settings UI (#15), generation/expand/serendipity routes (`app/api/cards/generate`, `app/api/serendipity`, #17, #19, #28),
 import & embed routes (#20, #21), and the d3-force Web Worker.
 Do not assume these exist — check the tree.
 
