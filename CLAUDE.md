@@ -25,7 +25,7 @@ strings for a single provider (Anthropic). **v2 replaced that model:**
 | v1 (prototype) | v2 (current) |
 |---|---|
 | `React.createElement` code strings | **Self-contained HTML cards** (inline CSS/JS, `--cm-*` theme vars) — see [`docs/card-spec.md`](docs/card-spec.md) |
-| Anthropic-only, key in env | **Multi-provider adapters** (Anthropic / OpenAI / OpenAI-compatible), per-user encrypted keys _(planned — #11–#15)_ |
+| Anthropic-only, key in env | **Multi-provider adapters** (registry built; Anthropic / OpenAI / OpenAI-compatible adapters & settings UI _planned — #12–#15_) |
 | No auth | **NextAuth.js** (GitHub / Google OAuth) |
 | Single `visualizations` table | **`concept_cards`** with versions, status, votes, remixes |
 | Client-side in-memory cache | **PostgreSQL 16 + pgvector** via Drizzle |
@@ -47,7 +47,7 @@ embedding default, or an `EMBEDDING_MODEL` env var, it is stale v1 — trust the
 | Database | PostgreSQL 16 + pgvector | PostgreSQL (permissive) |
 | ORM | Drizzle ORM | Apache-2.0 |
 | Auth | NextAuth.js (`next-auth@5`, Drizzle adapter) | ISC |
-| AI | `@anthropic-ai/sdk` today; provider adapters _(planned — #11)_ | MIT |
+| AI | Provider adapter registry (`lib/ai/adapters/`); `@anthropic-ai/sdk` + concrete adapters _(planned — #12–#14)_ | MIT |
 | Card validation | Playwright (headless Chromium) | Apache-2.0 |
 | Viz sandboxing | iframe `sandbox="allow-scripts"` rendering self-contained HTML | N/A |
 
@@ -62,10 +62,16 @@ PostgreSQL) license. No GPL. Check before adding.**
 - New nodes appear relative to their parent and settle via d3-force without reshuffling everything.
 
 ### AI Pipeline is Server-Side
-- Provider API keys NEVER reach the client. User keys are encrypted at rest
-  (`ENCRYPTION_KEY`, AES via `lib/crypto.ts`) and only decrypted server-side.
-- All AI calls happen in Next.js Route Handlers. `lib/ai/client.ts` resolves a key in this
-  order: the signed-in user's encrypted key → `ANTHROPIC_API_KEY` → `DEFAULT_PROVIDER`/`DEFAULT_API_KEY`.
+- Provider API keys NEVER reach the client. Session-scoped provider keys are encrypted at rest
+  with AES-256-GCM in an `HttpOnly` cookie (`lib/ai/session-key.ts`, `lib/ai/session-cookie.ts`,
+  not stored in DB). Legacy DB-stored Anthropic keys (`users.encrypted_api_key`, `lib/crypto.ts`)
+  remain supported as a fallback.
+- All AI calls will run in Next.js Route Handlers through the provider adapter registry
+  (`lib/ai/adapters/registry.ts`) and `resolveProvider()` (`lib/ai/resolve-provider.ts`) — both
+  modules exist today, while concrete adapters _(planned — #12–#14)_ and generation/expand/serendipity
+  routes _(planned — #17, #19, #28)_ are not wired yet. `resolveProvider()` resolves credentials
+  in order: per-request key → encrypted session cookie → legacy user DB key (Anthropic only) →
+  `DEFAULT_PROVIDER`/`DEFAULT_API_KEY` → `ANTHROPIC_API_KEY`.
 - Generation streams progress to the client via SSE _(planned — #17)_.
 - Pipeline: Plan → Generate → Validate (Playwright) → Fix (one retry) → Save.
 
@@ -119,11 +125,15 @@ store/
 └── uiStore.ts                    # selection, modals, search
 
 lib/
-├── ai/client.ts                  # Anthropic client + key resolution
+├── ai/
+│   ├── adapters/{types,registry,url-validation}.ts  # ProviderAdapter interface, server registry, SSRF URL checks
+│   ├── {session-key,session-cookie}.ts  # AES-256-GCM HttpOnly session cookie key storage
+│   ├── resolve-provider.ts       # server-side provider + credential resolution
+│   └── client.ts                 # legacy Anthropic client + DB key fallback helper
 ├── auth.ts, auth.config.ts       # NextAuth config
 ├── cards/theme.ts                # card theme CSS vars, injector, embed snippet builder
 ├── cards/{validate,static-checks,screenshot,browser,validate-types}.ts  # Playwright card validation
-├── crypto.ts                     # encrypt/decrypt user API keys
+├── crypto.ts                     # encrypt/decrypt legacy DB user API keys
 ├── db/{client,schema,seed}.ts    # Drizzle client, schema, seed
 ├── db/migrations/                # checked-in SQL migrations + meta
 ├── db/seed-cards/*.html          # reference seed card HTML
@@ -134,7 +144,7 @@ types/
 └── mesh.ts                       # ConceptNode/Edge data, Viewport, zoom thresholds
 ```
 
-**Not yet built** (each has an epic issue): provider adapter layer (`lib/ai/adapters/`, #11–#14),
+**Not yet built** (each has an epic issue): concrete provider adapters (`lib/ai/adapters/{anthropic,openai,openai-compat}.ts`, #12–#14),
 generation/expand/serendipity routes (`app/api/cards/generate`, `app/api/serendipity`, #17, #19, #28),
 import & embed routes (#20, #21), and the d3-force Web Worker.
 Do not assume these exist — check the tree.
